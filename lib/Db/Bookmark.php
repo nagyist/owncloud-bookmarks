@@ -1,6 +1,7 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -29,10 +30,6 @@ use OCP\AppFramework\Db\Entity;
  * @method setAvailable(boolean $available)
  * @method int getArchivedFile()
  * @method setArchivedFile(int $fileId)
- * @method string getTextContent()
- * @method setTextContent(string $content)
- * @method string getHtmlContent()
- * @method setHtmlContent(string $content)
  * @method string getUserId()
  * @method setUserId(string $userId)
  */
@@ -57,6 +54,9 @@ class Bookmark extends Entity {
 	public static function fromArray($props): self {
 		$bookmark = new Bookmark();
 		foreach ($props as $prop => $val) {
+			if ($prop === 'target') {
+				$prop = 'url';
+			}
 			$bookmark->{'set' . $prop}($val);
 		}
 		return $bookmark;
@@ -80,7 +80,16 @@ class Bookmark extends Entity {
 	public function toArray(): array {
 		$array = [];
 		foreach (self::$fields as $field) {
-			$array[$field] = $this->{$field};
+			if ($field === 'url') {
+				if (!preg_match('/^javascript:/i', $this->url)) {
+					$array['url'] = $this->url;
+				} else {
+					$array['url'] = '';
+				}
+				$array['target'] = $this->url;
+				continue;
+			}
+			$array[$field] = $this->{'get' . $field}();
 		}
 		return $array;
 	}
@@ -95,17 +104,51 @@ class Bookmark extends Entity {
 
 	public function setTitle(string $title): void {
 		// Cap title length at 1024 because the DB doesn't have more space currently (4096 byte with utf8mb4)
-		if (mb_strlen($title) > 1024) {
-			$title = mb_substr($title, 0, 1023) . '…';
+		if (strlen($title) > 1024) {
+			$title = substr($title, 0, 1020) . '…';
 		}
+		// Remove non-utf-8 characters from string: https://stackoverflow.com/questions/1401317/remove-non-utf8-characters-from-string
+		$title = mb_convert_encoding($title, 'UTF-8', 'UTF-8');
 		$this->setter('title', [$title]);
 	}
 
 	public function setDescription(string $desc): void {
 		// Cap title length at 1024 because the DB doesn't have more space currently (4096 byte with utf8mb4)
-		if (mb_strlen($desc) > 1024) {
-			$desc = mb_substr($desc, 0, 1023) . '…';
+		if (strlen($desc) > 1024) {
+			$desc = substr($desc, 0, 1020) . '…';
 		}
+		// Remove non-utf-8 characters from string: https://stackoverflow.com/questions/1401317/remove-non-utf8-characters-from-string
+		$desc = mb_convert_encoding($desc, 'UTF-8', 'UTF-8');
 		$this->setter('description', [$desc]);
+	}
+
+	public function setTextContent(?string $content): void {
+		if ($content !== null) {
+			// Remove non-utf-8 characters from string: https://stackoverflow.com/questions/1401317/remove-non-utf8-characters-from-string
+			$content = mb_convert_encoding($content, 'UTF-8', 'UTF-8');
+		}
+		$this->setter('textContent', [$content]);
+	}
+
+	public function getTextContent(): string {
+		// Remove non-utf-8 characters from string: https://stackoverflow.com/questions/1401317/remove-non-utf8-characters-from-string
+		return (string)mb_convert_encoding($this->textContent, 'UTF-8', 'UTF-8');
+	}
+
+	public function setHtmlContent(?string $content): void {
+		if ($content !== null) {
+			// Remove non-utf-8 characters from string: https://stackoverflow.com/questions/1401317/remove-non-utf8-characters-from-string
+			$content = mb_convert_encoding($content, 'UTF-8', 'UTF-8');
+		}
+		$this->setter('htmlContent', [$content]);
+	}
+
+	public function getHtmlContent(): string {
+		// Remove non-utf-8 characters from string: https://stackoverflow.com/questions/1401317/remove-non-utf8-characters-from-string
+		return (string)mb_convert_encoding($this->htmlContent, 'UTF-8', 'UTF-8');
+	}
+
+	public function isWebLink() {
+		return (bool)preg_match('/^https?:/i', $this->getUrl());
 	}
 }

@@ -1,6 +1,7 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -13,18 +14,21 @@ class QueryParameters {
 	public const CONJ_AND = 'and';
 	public const CONJ_OR = 'or';
 
-	private $limit = 10;
-	private $offset = 0;
+	private int $limit = 10;
+	private int $offset = 0;
 	private $sortBy;
 	private $conjunction = self::CONJ_AND;
 	private $folder;
-	private $url;
-	private $untagged = false;
-	private $unavailable = false;
-	private $archived = false;
-	private $duplicated = false;
+	private ?string $url = null;
+	private bool $untagged = false;
+	private bool $unavailable = false;
+	private bool $archived = false;
+	private bool $duplicated = false;
 	private $search = [];
 	private $tags = [];
+	private bool $recursive = false;
+	private bool $softDeleted = false;
+	private bool $softDeletedFolders = false;
 
 	/**
 	 * @return array
@@ -100,7 +104,7 @@ class QueryParameters {
 	 * @param array|null $columns
 	 * @return string|null
 	 */
-	public function getSortBy(string $default = null, array $columns = null): ?string {
+	public function getSortBy(?string $default = null, ?array $columns = null): ?string {
 		if (isset($default) && !isset($this->sortBy)) {
 			return $default;
 		}
@@ -240,5 +244,53 @@ class QueryParameters {
 	 */
 	public function getDuplicated(): bool {
 		return $this->duplicated;
+	}
+
+	/**
+	 * @param bool $recursive
+	 * @return static
+	 */
+	public function setRecursive(bool $recursive): self {
+		$this->recursive = $recursive;
+		return $this;
+	}
+
+	/**
+	 * @return bool
+	 */
+	public function getRecursive(): bool {
+		return $this->recursive;
+	}
+
+	/**
+	 * @return bool
+	 */
+	public function getSoftDeleted(): bool {
+		return $this->softDeleted;
+	}
+
+	/**
+	 * @param bool $softDeleted
+	 * @return $this
+	 */
+	public function setSoftDeleted(bool $softDeleted): QueryParameters {
+		$this->softDeleted = $softDeleted;
+		return $this;
+	}
+
+	/**
+	 * @return bool
+	 */
+	public function getSoftDeletedFolders(): bool {
+		return $this->softDeletedFolders;
+	}
+
+	/**
+	 * @param bool $softDeletedFolders
+	 * @return $this
+	 */
+	public function setSoftDeletedFolders(bool $softDeletedFolders): QueryParameters {
+		$this->softDeletedFolders = $softDeletedFolders;
+		return $this;
 	}
 }

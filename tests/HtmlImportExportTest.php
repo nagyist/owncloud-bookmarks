@@ -103,7 +103,7 @@ class HtmlImportExportTest extends TestCase {
 		$this->assertCount(1, $this->treeMapper->findChildren(Db\TreeMapper::TYPE_BOOKMARK, $result['imported'][4]['id']));
 
 		/**
-		 * @var $firstBookmark Db\Bookmark
+		 * @var Db\Bookmark $firstBookmark
 		 */
 		$firstBookmark = $this->bookmarkMapper->find($result['imported'][0]['children'][0]['id']);
 		$this->assertSame('Title 0', $firstBookmark->getTitle());
@@ -166,10 +166,10 @@ class HtmlImportExportTest extends TestCase {
 				return Db\Bookmark::fromArray($props);
 			}, [
 				['url' => 'https://google.com/', 'title' => 'Google', 'description' => 'Search engine'],
-				['url' => 'https://nextcloud.com/', 'title' => 'Nextcloud'],
-				['url' => 'https://php.net/'],
-				['url' => 'https://de.wikipedia.org/wiki/%C3%9C'],
-				['url' => 'https://github.com/nextcloud/bookmarks/projects/1'],
+				['url' => 'https://nextcloud.com/', 'title' => 'Nextcloud', 'description' => ''],
+				['url' => 'https://php.net/', 'title' => '', 'description' => ''],
+				['url' => 'https://de.wikipedia.org/wiki/%C3%9C', 'title' => '', 'description' => ''],
+				['url' => 'https://github.com/nextcloud/bookmarks/projects/1', 'title' => '', 'description' => ''],
 			]),
 		];
 	}

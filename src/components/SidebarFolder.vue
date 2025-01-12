@@ -1,5 +1,5 @@
 <!--
-  - Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+  - Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
   -
   - This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
   -->
@@ -7,17 +7,17 @@
 <template>
 	<NcAppSidebar v-if="isActive"
 		class="sidebar"
-		:title="folder.title"
+		:name="folder.title"
 		:active.sync="activeTab"
 		@close="onClose">
 		<NcAppSidebarTab id="folder-details"
 			:name="t('bookmarks', 'Details')"
 			:order="0">
 			<template #icon>
-				<InformationVariantIcon />
+				<InformationVariantIcon :size="20" />
 			</template>
 			<h3>{{ t('bookmarks', 'Owner') }}</h3>
-			<NcUserBubble :user="folder.userId" :display-name="folder.userId" />
+			<NcUserBubble :user="folder.userId" :display-name="folder.userDisplayName" />
 			<h3>{{ t('bookmarks', 'Bookmarks') }}</h3>
 			{{ bookmarkCount }}
 		</NcAppSidebarTab>
@@ -26,11 +26,11 @@
 			:name="t('bookmarks', 'Sharing')"
 			:order="1">
 			<template #icon>
-				<ShareVariantIcon />
+				<ShareVariantIcon :size="20" />
 			</template>
 			<div class="participant-select">
-				<AccountIcon :class="{'share__avatar': true }" />
-				<NcMultiselect v-model="participant"
+				<AccountIcon :size="20" :class="{'share__avatar': true }" />
+				<NcSelect v-model="participant"
 					label="displayName"
 					track-by="user"
 					class="participant-select__selection"
@@ -38,11 +38,11 @@
 					:options="participantSearchResults"
 					:loading="isSearching"
 					:placeholder="t('bookmarks', 'Select a user or group')"
-					@select="onAddShare"
-					@search-change="onParticipantSearch" />
+					@option:selected="onAddShare"
+					@search="onParticipantSearch" />
 			</div>
 			<div class="share">
-				<LinkIcon :class="{'share__avatar': true, active: publicLink }" />
+				<LinkIcon :size="20" :class="{'share__avatar': true, active: publicLink }" />
 				<h3 class="share__title">
 					{{ t('bookmarks', 'Share link') }}
 				</h3>
@@ -58,27 +58,27 @@
 					<template v-if="publicLink">
 						<NcActionButton @click="onCopyPublicLink">
 							<template #icon>
-								<ClipboardIcon />
+								<ClipboardIcon :size="20" />
 							</template>
 							{{ t('bookmarks', 'Copy link') }}
 						</NcActionButton>
 						<NcActionButton icon="icon-clippy" @click="onCopyRssLink">
 							<template #icon>
-								<RssIcon />
+								<RssIcon :size="20" />
 							</template>
 							{{ t('bookmarks', 'Copy RSS feed') }}
 						</NcActionButton>
 						<NcActionSeparator />
 						<NcActionButton @click="onDeletePublicLink">
 							<template #icon>
-								<DeleteIcon />
+								<DeleteIcon :size="20" />
 							</template>
 							{{ t('bookmarks', 'Delete link') }}
 						</NcActionButton>
 					</template>
 					<NcActionButton v-else @click="onAddPublicLink">
 						<template #icon>
-							<PlusIcon />
+							<PlusIcon :size="20" />
 						</template>
 						{{ t('bookmarks', 'Create public link') }}
 					</NcActionButton>
@@ -86,9 +86,13 @@
 			</div>
 			<div v-for="share of shares" :key="share.id">
 				<div class="share">
-					<NcAvatar :user="share.participant" class="share__avatar" :size="44" />
+					<NcAvatar v-if="share.type < 2"
+						:user="share.participant"
+						class="share__avatar"
+						:size="44" />
+					<CircleIcon v-if="share.type === 7" :size="20" class="share_avatar" />
 					<h3 class="share__title">
-						{{ share.participant }}
+						{{ share.participantDisplayName }}
 					</h3>
 					<div class="share__privs">
 						<div v-if="share.canShare"
@@ -126,27 +130,16 @@
 	</NcAppSidebar>
 </template>
 <script>
-import { NcAppSidebar, NcUserBubble, NcActionSeparator, NcActionCheckbox, NcActionButton, NcActions, NcMultiselect, NcAvatar, NcAppSidebarTab } from '@nextcloud/vue'
+import { NcAppSidebar, NcUserBubble, NcActionSeparator, NcActionCheckbox, NcActionButton, NcActions, NcSelect, NcAvatar, NcAppSidebarTab } from '@nextcloud/vue'
 import { getCurrentUser } from '@nextcloud/auth'
 import { generateUrl, generateOcsUrl } from '@nextcloud/router'
 import axios from '@nextcloud/axios'
-import copy from 'copy-text-to-clipboard'
 import { actions, mutations } from '../store/index.js'
-import EyeIcon from 'vue-material-design-icons/Eye.vue'
-import PencilIcon from 'vue-material-design-icons/Pencil.vue'
-import ShareAllIcon from 'vue-material-design-icons/ShareAll.vue'
-import ShareVariantIcon from 'vue-material-design-icons/ShareVariant.vue'
-import InformationVariantIcon from 'vue-material-design-icons/InformationVariant.vue'
-import ClipboardIcon from 'vue-material-design-icons/Clipboard.vue'
-import DeleteIcon from 'vue-material-design-icons/Delete.vue'
-import RssIcon from 'vue-material-design-icons/Rss.vue'
-import PlusIcon from 'vue-material-design-icons/Plus.vue'
-import LinkIcon from 'vue-material-design-icons/Link.vue'
-import AccountIcon from 'vue-material-design-icons/Account.vue'
+import { EyeIcon, PencilIcon, ShareAllIcon, ShareVariantIcon, InformationVariantIcon, ClipboardIcon, DeleteIcon, RssIcon, PlusIcon, LinkIcon, AccountIcon, CircleIcon } from './Icons.js'
 
 export default {
 	name: 'SidebarFolder',
-	components: { NcAppSidebar, NcAppSidebarTab, NcAvatar, NcMultiselect, NcActionButton, NcActionCheckbox, NcActions, NcUserBubble, NcActionSeparator, EyeIcon, PencilIcon, ShareAllIcon, ShareVariantIcon, InformationVariantIcon, ClipboardIcon, RssIcon, PlusIcon, DeleteIcon, LinkIcon, AccountIcon },
+	components: { NcAppSidebar, NcAppSidebarTab, NcAvatar, NcSelect, NcActionButton, NcActionCheckbox, NcActions, NcUserBubble, NcActionSeparator, EyeIcon, PencilIcon, ShareAllIcon, ShareVariantIcon, InformationVariantIcon, ClipboardIcon, RssIcon, PlusIcon, DeleteIcon, LinkIcon, AccountIcon, CircleIcon },
 	data() {
 		return {
 			participantSearchResults: [],
@@ -203,14 +196,13 @@ export default {
 				window.location.origin
 					+ generateUrl(
 						'/apps/bookmarks/public/rest/v2/bookmark?'
-							+ new URLSearchParams(
-								Object.assign({}, this.$store.state.fetchState.query, {
-									format: 'rss',
-									page: -1,
-									token: this.token,
-								})
-							).toString()
-					)
+							+ new URLSearchParams({
+								format: 'rss',
+								folder: this.folder.id,
+								page: -1,
+								token: this.token,
+							}),
+					).toString()
 			)
 		},
 		bookmarkCount() {
@@ -233,11 +225,11 @@ export default {
 			this.onCopyPublicLink()
 		},
 		onCopyPublicLink() {
-			copy(this.publicLink)
+			navigator.clipboard.writeText(this.publicLink)
 			this.$store.commit(mutations.SET_NOTIFICATION, t('bookmarks', 'Link copied'))
 		},
 		onCopyRssLink() {
-			copy(this.rssLink)
+			navigator.clipboard.writeText(this.rssLink)
 			this.$store.commit(mutations.SET_NOTIFICATION, t('bookmarks', 'RSS feed copied'))
 		},
 		async onDeletePublicLink() {
@@ -248,13 +240,14 @@ export default {
 				return
 			}
 			this.isSearching = true
-			const { data: { ocs: { data, meta } } } = await axios.get(generateOcsUrl('apps/files_sharing/api/v1', 1) + `/sharees?format=json&itemType=folder&search=${searchTerm}&lookup=false&perPage=200&shareType[]=0&shareType[]=1`)
+			const { data: { ocs: { data, meta } } } = await axios.get(generateOcsUrl('apps/files_sharing/api/v1', 1) + `/sharees?format=json&itemType=folder&search=${searchTerm}&lookup=false&perPage=200&shareType[]=0&shareType[]=1&shareType[]=7`)
 			if (meta.status !== 'ok') {
 				this.participantSearchResults = []
 				return
 			}
 			const users = data.exact.users.concat(data.users)
 			const groups = data.exact.groups.concat(data.groups)
+			const circles = data.exact.circles.concat(data.circles)
 			this.participantSearchResults = users.map(result => ({
 				user: result.value.shareWith,
 				displayName: result.label,
@@ -265,11 +258,17 @@ export default {
 				displayName: result.label,
 				icon: 'icon-group',
 				isNoUser: true,
+			}))).concat(circles.map(result => ({
+				user: result.value.shareWith,
+				displayName: result.label,
+				icon: 'icon-circle',
+				isNoUser: true,
+				isCircle: true,
 			})))
 			this.isSearching = false
 		},
 		async onAddShare(user) {
-			await this.$store.dispatch(actions.CREATE_SHARE, { folderId: this.folder.id, participant: user.user, type: user.isNoUser ? 1 : 0 })
+			await this.$store.dispatch(actions.CREATE_SHARE, { folderId: this.folder.id, participant: user.user, type: user.isNoUser ? (user.isCircle ? 7 : 1) : 0 })
 		},
 		async onEditShare(shareId, { canWrite, canShare }) {
 			await this.$store.dispatch(actions.EDIT_SHARE, { shareId, canWrite, canShare })
@@ -281,6 +280,11 @@ export default {
 }
 </script>
 <style>
+	.sidebar h3 {
+		font-size: 1em;
+		font-weight: normal;
+	}
+
 	.participant-select {
 		display: flex;
 	}
@@ -304,11 +308,10 @@ export default {
 		flex-grow: 0;
 		height: 44px;
 		width: 44px;
-		padding: 10px;
 	}
 
 	.share__avatar.active {
-		background-color: var(--color-primary-light);
+		background-color: var(--color-primary-element-light);
 		border-radius: 44px;
 	}
 

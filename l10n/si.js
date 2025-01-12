@@ -14,6 +14,8 @@ OC.L10N.register(
     "Select folder" : "බහාලුම තෝරන්න",
     "Cancel" : "අවලංගු කරන්න",
     "Files" : "ගොනු",
+    "Install web app" : "වියමන යෙදුම ස්ථාපනය කරන්න",
+    "Need help?" : "උපකාරයක් අවශ්‍යයද?",
     "Link" : "සබැඳිය",
     "Notes" : "සටහන්",
     "Download file" : "ගොනුව බාගන්න",

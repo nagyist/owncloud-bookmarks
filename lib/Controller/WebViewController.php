@@ -1,7 +1,7 @@
 <?php
 
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -13,6 +13,7 @@ use OCA\Bookmarks\Db\Folder;
 use OCA\Bookmarks\Db\FolderMapper;
 use OCA\Bookmarks\Db\PublicFolder;
 use OCA\Bookmarks\Db\PublicFolderMapper;
+use OCA\Bookmarks\Service\UserSettingsService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
@@ -21,50 +22,14 @@ use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\NotFoundResponse;
 use OCP\AppFramework\Http\StreamResponse;
 use OCP\AppFramework\Http\Template\PublicTemplateResponse;
-use OCP\IConfig;
+use OCP\IInitialStateService;
 use OCP\IL10N;
 use OCP\IRequest;
 use OCP\IURLGenerator;
 use OCP\IUserManager;
 
 class WebViewController extends Controller {
-	/** @var string */
-	private $userId;
-
-	/**
-	 * @var IL10N
-	 */
-	private $l;
-
-	/**
-	 * @var PublicFolderMapper
-	 */
-	private $publicFolderMapper;
-
-	/**
-	 * @var IUserManager
-	 */
-	private $userManager;
-	/**
-	 * @var FolderMapper
-	 */
-	private $folderMapper;
-	/**
-	 * @var IURLGenerator
-	 */
-	private $urlGenerator;
-	/**
-	 * @var \OCP\IInitialStateService
-	 */
-	private $initialState;
-	/**
-	 * @var InternalFoldersController
-	 */
-	private $folderController;
-	/**
-	 * @var IConfig
-	 */
-	private $config;
+	private ?string $userId;
 
 
 	/**
@@ -72,27 +37,34 @@ class WebViewController extends Controller {
 	 *
 	 * @param string $appName
 	 * @param IRequest $request
-	 * @param $userId
+	 * @param string|null $userId
 	 * @param IL10N $l
 	 * @param PublicFolderMapper $publicFolderMapper
 	 * @param IUserManager $userManager
 	 * @param FolderMapper $folderMapper
 	 * @param IURLGenerator $urlGenerator
-	 * @param \OCP\IInitialStateService $initialState
+	 * @param IInitialStateService $initialState
 	 * @param InternalFoldersController $folderController
-	 * @param IConfig $config
+	 * @param InternalBookmarkController $bookmarkController
+	 * @param UserSettingsService $userSettingsService
 	 */
-	public function __construct($appName, $request, $userId, IL10N $l, PublicFolderMapper $publicFolderMapper, IUserManager $userManager, FolderMapper $folderMapper, IURLGenerator $urlGenerator, \OCP\IInitialStateService $initialState, \OCA\Bookmarks\Controller\InternalFoldersController $folderController, IConfig $config) {
+	public function __construct(
+		$appName,
+		IRequest $request,
+		?string $userId,
+		private IL10N $l,
+		private PublicFolderMapper $publicFolderMapper,
+		private IUserManager $userManager,
+		private FolderMapper $folderMapper,
+		private IURLGenerator $urlGenerator,
+		private \OCP\IInitialStateService $initialState,
+		private \OCA\Bookmarks\Controller\InternalFoldersController $folderController,
+		private \OCA\Bookmarks\Controller\InternalBookmarkController $bookmarkController,
+		private \OCA\Bookmarks\Controller\InternalTagsController $tagsController,
+		private UserSettingsService $userSettingsService,
+	) {
 		parent::__construct($appName, $request);
 		$this->userId = $userId;
-		$this->l = $l;
-		$this->publicFolderMapper = $publicFolderMapper;
-		$this->userManager = $userManager;
-		$this->folderMapper = $folderMapper;
-		$this->urlGenerator = $urlGenerator;
-		$this->initialState = $initialState;
-		$this->folderController = $folderController;
-		$this->config = $config;
 	}
 
 	/**
@@ -112,13 +84,17 @@ class WebViewController extends Controller {
 		$policy->addAllowedFrameDomain("'self'");
 		$res->setContentSecurityPolicy($policy);
 
-		// Provide complete folder hierarchy
 		$this->initialState->provideInitialState($this->appName, 'folders', $this->folderController->getFolders()->getData()['data']);
+		$this->initialState->provideInitialState($this->appName, 'deletedFolders', $this->folderController->getDeletedFolders()->getData()['data']);
+		$this->initialState->provideInitialState($this->appName, 'archivedCount', $this->bookmarkController->countArchived()->getData()['item']);
+		$this->initialState->provideInitialState($this->appName, 'duplicatedCount', $this->bookmarkController->countDuplicated()->getData()['item']);
+		$this->initialState->provideInitialState($this->appName, 'unavailableCount', $this->bookmarkController->countUnavailable()->getData()['item']);
+		$this->initialState->provideInitialState($this->appName, 'allCount', $this->bookmarkController->countBookmarks(-1)->getData()['item']);
+		$this->initialState->provideInitialState($this->appName, 'allClicksCount', $this->bookmarkController->countAllClicks()->getData()['item']);
+		$this->initialState->provideInitialState($this->appName, 'withClicksCount', $this->bookmarkController->countWithClicks()->getData()['item']);
+		$this->initialState->provideInitialState($this->appName, 'tags', $this->tagsController->fullTags(true)->getData());
 
-		$settings = [];
-		foreach (['sorting', 'viewMode'] as $setting) {
-			$settings[$setting] = $this->config->getUserValue($this->userId, $this->appName, $setting);
-		}
+		$settings = $this->userSettingsService->toArray();
 		$this->initialState->provideInitialState($this->appName, 'settings', $settings);
 
 		return $res;
@@ -130,9 +106,8 @@ class WebViewController extends Controller {
 	 * @return NotFoundResponse|PublicTemplateResponse
 	 *
 	 * @NoAdminRequired
-	 *
 	 * @NoCSRFRequired
-	 *
+	 * @BruteForceProtection(action=link)
 	 * @PublicPage
 	 */
 	public function link(string $token) {
@@ -140,11 +115,11 @@ class WebViewController extends Controller {
 		$userName = 'Unknown';
 		try {
 			/**
-			 * @var $publicFolder PublicFolder
+			 * @var PublicFolder $publicFolder
 			 */
 			$publicFolder = $this->publicFolderMapper->find($token);
 			/**
-			 * @var $folder Folder
+			 * @var Folder $folder
 			 */
 			$folder = $this->folderMapper->find($publicFolder->getFolderId());
 			$title = $folder->getTitle();
@@ -152,10 +127,10 @@ class WebViewController extends Controller {
 			if ($user !== null) {
 				$userName = $user->getDisplayName();
 			}
-		} catch (DoesNotExistException $e) {
-			return new NotFoundResponse();
-		} catch (MultipleObjectsReturnedException $e) {
-			return new NotFoundResponse();
+		} catch (DoesNotExistException|MultipleObjectsReturnedException $e) {
+			$res = new NotFoundResponse();
+			$res->throttle();
+			return $res;
 		}
 
 		$res = new PublicTemplateResponse($this->appName, 'main', []);
@@ -173,7 +148,7 @@ class WebViewController extends Controller {
 	 * @return StreamResponse
 	 */
 	public function serviceWorker(): StreamResponse {
-		$response = new StreamResponse(__DIR__.'/../../js/bookmarks-service-worker.js');
+		$response = new StreamResponse(__DIR__ . '/../../js/bookmarks-service-worker.js');
 		$response->setHeaders(['Content-Type' => 'application/javascript']);
 		$policy = new ContentSecurityPolicy();
 		$policy->addAllowedWorkerSrcDomain("'self'");

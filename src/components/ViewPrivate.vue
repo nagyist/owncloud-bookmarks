@@ -1,5 +1,5 @@
 <!--
-  - Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+  - Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
   -
   - This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
   -->
@@ -22,6 +22,7 @@
 		<CopyDialog />
 		<LoadingModal />
 		<BookmarkContent />
+		<WhatsnewModal />
 	</NcContent>
 </template>
 
@@ -39,6 +40,7 @@ import { privateRoutes } from '../router.js'
 import { actions, mutations } from '../store/index.js'
 import LoadingModal from './LoadingModal.vue'
 import BookmarkContent from './BookmarkContent.vue'
+import WhatsnewModal from './WhatsnewModal.vue'
 import { getCurrentUser } from '@nextcloud/auth'
 
 export default {
@@ -56,12 +58,15 @@ export default {
 		SidebarFolder,
 		MoveDialog,
 		CopyDialog,
+		WhatsnewModal,
 	},
 	data() {
 		return {
 			newBookmark: false,
 			showDetails: false,
 			smallScreen: false,
+			showWhatsnew: false,
+			initialLoad: false,
 		}
 	},
 	computed: {
@@ -74,42 +79,47 @@ export default {
 		isFolderView() {
 			return this.$route.name === privateRoutes.FOLDER || this.$route.name === privateRoutes.HOME
 		},
+		isSharedWithYou() {
+			return this.$route.name === privateRoutes.SHARED_FOLDERS
+		},
+		isTrashbin() {
+			const folder = this.$store.getters.getFolder(this.$route.params.folder || '-1')[0]
+			return this.$route.name === privateRoutes.TRASHBIN || (this.$route.name === privateRoutes.FOLDER && folder.softDeleted)
+		},
 		showFolderOverview() {
-			return this.isFolderView && !this.smallScreen && this.folders.length
+			return this.isFolderView && !this.smallScreen && this.folders.length && !this.isTrashbin && !this.isSharedWithYou
 		},
 	},
 	watch: {
 		$route: 'onRoute',
 		async showFolderOverview(value) {
-			// hack to make bookmarkslist rerender
-			await this.$store.dispatch(actions.SET_SETTING, {
-				key: 'viewMode',
-				value: this.$store.state.viewMode === 'grid' ? 'list' : 'grid',
-			})
-			await this.$store.dispatch(actions.SET_SETTING, {
-				key: 'viewMode',
-				value: this.$store.state.viewMode === 'grid' ? 'list' : 'grid',
-			})
+			if (!this.initialLoad && value) {
+				// hack to make bookmarkslist rerender
+				await this.$store.dispatch(actions.RELOAD_VIEW)
+			}
 		},
 	},
 	async created() {
+		this.initialLoad = true
 		const mediaQuery = window.matchMedia('(max-width: 1024px)')
 		this.smallScreen = mediaQuery.matches
 		mediaQuery.addEventListener('change', this.onWindowFormatChange)
 
-	  if (OCA.Search) {
-	    // legacy search pre nc v20
-			this.search = new window.OCA.Search(this.onSearch, this.onResetSearch)
-		}
 		// set loading indicator
 		this.$store.commit(mutations.FETCH_START, { type: 'bookmarks' })
 
 		await this.reloadSettings()
-		this.onRoute()
-		this.reloadFolders()
+
 		this.reloadSharedFolders()
 		this.reloadCount()
 		this.reloadTags()
+
+		await Promise.all([
+			this.reloadFolders(),
+			this.reloadDeletedFolders(),
+		])
+
+		this.onRoute()
 
 		const currentUser = getCurrentUser()
 		if (currentUser.isAdmin) {
@@ -120,15 +130,19 @@ export default {
 				this.$store.commit(mutations.SET_NOTIFICATION, t('bookmarks', 'Network access is disabled by default. Go to administrator settings for the bookmarks app to allow fetching previews and favicons.'))
 			}
 		}
+		this.initialLoad = false
 	},
 
 	methods: {
 		async onRoute() {
 			const route = this.$route
 			this.$store.commit(mutations.RESET_SELECTION)
+			if (typeof this.$store.state.loading.bookmarks === 'function') {
+				this.$store.state.loading.bookmarks()
+			}
 			switch (route.name) {
 			case privateRoutes.HOME:
-				this.$store.dispatch(actions.FILTER_BY_FOLDER, '-1')
+				this.$store.dispatch(actions.FILTER_BY_FOLDER, { folder: '-1' })
 				break
 			case privateRoutes.RECENT:
 				this.$store.dispatch(actions.FILTER_BY_RECENT)
@@ -145,10 +159,15 @@ export default {
 			case privateRoutes.DUPLICATED:
 				this.$store.dispatch(actions.FILTER_BY_DUPLICATED)
 				break
-			case privateRoutes.SHARED_FOLDERS:
-				await this.$store.dispatch(actions.LOAD_SHARED_FOLDERS)
-				this.$store.commit(mutations.REMOVE_ALL_BOOKMARKS)
+			case privateRoutes.TRASHBIN:
 				this.$store.commit(mutations.FETCH_END, 'bookmarks')
+				await this.$store.dispatch(actions.LOAD_DELETED_BOOKMARKS)
+				await this.$store.dispatch(actions.LOAD_DELETED_FOLDERS)
+				break
+			case privateRoutes.SHARED_FOLDERS:
+				this.$store.dispatch(actions.LOAD_SHARED_FOLDERS)
+				await this.$store.dispatch(actions.RELOAD_VIEW)
+				await this.$store.commit(mutations.REMOVE_ALL_BOOKMARKS)
 				break
 			case privateRoutes.BOOKMARK:
 				await this.$store.dispatch(actions.LOAD_BOOKMARK, route.params.bookmark)
@@ -156,16 +175,18 @@ export default {
 				this.$store.commit(mutations.FETCH_END, 'bookmarks')
 				break
 			case privateRoutes.FOLDER:
-				this.$store.dispatch(actions.FILTER_BY_FOLDER, route.params.folder)
+				// eslint-disable-next-line no-case-declarations
+				const folder = this.$store.getters.getFolder(route.params.folder)[0]
+				this.$store.dispatch(actions.FILTER_BY_FOLDER, { folder: route.params.folder, softDeleted: folder.softDeleted })
 				break
 			case privateRoutes.TAGS:
 				this.$store.dispatch(
 					actions.FILTER_BY_TAGS,
-					route.params.tags.split(',')
+					route.params.tags.split(','),
 				)
 				break
 			case privateRoutes.SEARCH:
-				this.$store.dispatch(actions.FILTER_BY_SEARCH, route.params.search)
+				this.$store.dispatch(actions.FILTER_BY_SEARCH, { search: route.params.search, folder: route.params.folder || -1 })
 				break
 			default:
 				throw new Error('Nothing here. Move along.')
@@ -177,6 +198,9 @@ export default {
 		},
 		async reloadFolders() {
 			return this.$store.dispatch(actions.LOAD_FOLDERS)
+		},
+		async reloadDeletedFolders() {
+			return this.$store.dispatch(actions.LOAD_DELETED_FOLDERS)
 		},
 		async reloadSharedFolders() {
 			return this.$store.dispatch(actions.LOAD_SHARED_FOLDERS)
@@ -190,6 +214,8 @@ export default {
 				this.$store.dispatch(actions.COUNT_UNAVAILABLE),
 				this.$store.dispatch(actions.COUNT_ARCHIVED),
 				this.$store.dispatch(actions.COUNT_DUPLICATED),
+				this.$store.dispatch(actions.COUNT_ALL_CLICKS),
+				this.$store.dispatch(actions.COUNT_WITH_CLICKS),
 			])
 		},
 
@@ -206,7 +232,7 @@ export default {
 				OCP.AppConfig.getValue('bookmarks', setting, null, {
 					success: resolve,
 					error: reject,
-				})
+				}),
 			)
 			if (resDocument.querySelector('status').textContent !== 'ok') {
 				console.error('Failed request', resDocument)

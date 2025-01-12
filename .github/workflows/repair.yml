@@ -6,6 +6,8 @@ on:
     branches:
       - master
       - stable*
+    paths:
+      - 'lib/**'
 
 env:
   APP_NAME: bookmarks
@@ -21,9 +23,9 @@ jobs:
       # do not stop on another job's failure
       fail-fast: false
       matrix:
-        php-versions: ['7.4']
+        php-versions: ['8.1']
         databases: ['sqlite', 'mysql', 'pgsql']
-        server-versions: ['stable25']
+        server-versions: ['master']
 
     name: Repair step on ${{ matrix.databases }}-${{ matrix.server-versions }}
 

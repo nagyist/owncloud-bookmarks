@@ -5,7 +5,7 @@
   -->
 
 <template>
-	<NcModal v-if="showNcModal" :title="title" @close="onClose">
+	<NcModal v-if="showNcModal" :name="title" @close="onClose">
 		<div class="copy-dialog">
 			<FolderPicker :title="title" :filter="filterFolders" @submit="onSubmit" />
 		</div>
@@ -33,7 +33,7 @@ export default {
 			return n('bookmarks',
 				'Adding %n bookmark to new folder',
 				'Adding %n bookmarks to new folder',
-				this.selection.bookmarks.length
+				this.selection.bookmarks.length,
 			)
 		},
 	},

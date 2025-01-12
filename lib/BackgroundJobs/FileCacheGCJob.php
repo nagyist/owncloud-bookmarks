@@ -1,15 +1,16 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
 
 namespace OCA\Bookmarks\BackgroundJobs;
 
+use OCA\Bookmarks\Service\FileCache;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\TimedJob;
-use OCA\Bookmarks\Service\FileCache;
 use OCP\Files\NotPermittedException;
 use Psr\Log\LoggerInterface;
 
@@ -26,7 +27,7 @@ class FileCacheGCJob extends TimedJob {
 	private $logger;
 
 	public function __construct(
-		FileCache $fileCache, LoggerInterface $logger, ITimeFactory $timeFactory
+		FileCache $fileCache, LoggerInterface $logger, ITimeFactory $timeFactory,
 	) {
 		parent::__construct($timeFactory);
 		$this->setInterval(self::INTERVAL);
@@ -38,7 +39,7 @@ class FileCacheGCJob extends TimedJob {
 		try {
 			$this->fileCache->gc();
 		} catch (NotPermittedException $e) {
-			$this->logger->error('Could not collect garbage: '.$e->getMessage());
+			$this->logger->error('Could not collect garbage: ' . $e->getMessage());
 		}
 	}
 }

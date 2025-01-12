@@ -1,6 +1,7 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -32,10 +33,10 @@ class TagsController extends ApiController {
 	 *
 	 * @NoAdminRequired
 	 * @NoCSRFRequired
-	 * @CORS
+	 *
 	 */
-	public function deleteTag($old_name = ""): JSONResponse {
-		if ($old_name === "") {
+	public function deleteTag($old_name = ''): JSONResponse {
+		if ($old_name === '') {
 			return new JSONResponse([], Http::STATUS_BAD_REQUEST);
 		}
 
@@ -51,14 +52,14 @@ class TagsController extends ApiController {
 	 *
 	 * @NoAdminRequired
 	 * @NoCSRFRequired
-	 * @CORS
+	 *
 	 */
-	public function renameTag($old_name = "", $new_name = "", $name = ''): JSONResponse {
+	public function renameTag($old_name = '', $new_name = '', $name = ''): JSONResponse {
 		if ($new_name === '') {
 			$new_name = $name;
 		}
 
-		if ($old_name === "" || $new_name === "") {
+		if ($old_name === '' || $new_name === '') {
 			return new JSONResponse(['status' => 'error', 'data' => ['Must provide old_name and a new name']], Http::STATUS_BAD_REQUEST);
 		}
 
@@ -71,11 +72,11 @@ class TagsController extends ApiController {
 	 * @return JSONResponse
 	 * @NoAdminRequired
 	 * @NoCSRFRequired
-	 * @CORS
+	 *
 	 */
 	public function fullTags($count = false): JSONResponse {
-		header("Cache-Control: no-cache, must-revalidate");
-		header("Expires: Sat, 26 Jul 1997 05:00:00 GMT");
+		header('Cache-Control: no-cache, must-revalidate');
+		header('Expires: Sat, 26 Jul 1997 05:00:00 GMT');
 
 		if ($count === true) {
 			$tags = $this->tagMapper->findAllWithCount($this->userId);

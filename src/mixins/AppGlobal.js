@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -20,7 +20,7 @@ export default {
 			return getComputedStyle(document.documentElement).getPropertyValue('--color-primary-element')
 		},
 		colorPrimaryText() {
-			return getComputedStyle(document.documentElement).getPropertyValue('--color-primary-text')
+			return getComputedStyle(document.documentElement).getPropertyValue('--color-primary-element-text')
 		},
 		colorMainText() {
 			return getComputedStyle(document.documentElement).getPropertyValue('--color-main-text')
@@ -30,6 +30,9 @@ export default {
 		},
 		colorPlaceholderDark() {
 			return getComputedStyle(document.documentElement).getPropertyValue('--color-placeholder-dark')
+		},
+		defaultClickableArea() {
+			return getComputedStyle(document.documentElement).getPropertyValue('--default-clickable-area')
 		},
 	},
 }

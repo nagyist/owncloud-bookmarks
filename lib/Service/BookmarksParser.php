@@ -1,6 +1,7 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -24,6 +25,8 @@ use const LIBXML_PARSEHUGE;
  * @author Pedro Rodrigues <relvas.rodrigues@gmail.com>
  */
 class BookmarksParser {
+	public const THOUSAND_YEARS = 60 * 60 * 24 * 365 * 1000;
+
 	/**
 	 * Netscape Bookmark File Format DOCTYPE
 	 */
@@ -94,7 +97,7 @@ class BookmarksParser {
 	 * @return boolean
 	 */
 	public static function isValid($doctype): bool {
-		return self::DOCTYPE === $doctype;
+		return $doctype === self::DOCTYPE;
 	}
 
 	/**
@@ -105,7 +108,7 @@ class BookmarksParser {
 	 * @param bool $includeFolderTags If we should include folter tags
 	 * @param bool $useDateTimeObjects If we should return \DateTime objects
 	 *
-	 * @return mixed  A PHP value
+	 * @return mixed A PHP value
 	 *
 	 * @throws HtmlParseError
 	 */
@@ -115,7 +118,7 @@ class BookmarksParser {
 		if (empty($input)) {
 			throw new HtmlParseError("The input shouldn't be empty");
 		}
-		if (false === $document->loadHTML($input, LIBXML_PARSEHUGE)) {
+		if ($document->loadHTML($input, LIBXML_PARSEHUGE) === false) {
 			throw new HtmlParseError('The HTML value does not appear to be valid Netscape Bookmark File Format HTML.');
 		}
 		$this->xpath = new DOMXPath($document);
@@ -136,7 +139,7 @@ class BookmarksParser {
 	 *
 	 * @param DOMNode|null $node
 	 */
-	private function traverse(DOMNode $node = null): void {
+	private function traverse(?DOMNode $node = null): void {
 		$query = './*';
 		$entries = $this->xpath->query($query, $node ?: null);
 		if (!$entries) {
@@ -266,12 +269,18 @@ class BookmarksParser {
 		if ($this->useDateTimeObjects) {
 			if (isset($attributes['add_date'])) {
 				$added = new DateTime();
-				$added->setTimestamp((int)$attributes['add_date']);
+				if ((int)$attributes['add_date'] > self::THOUSAND_YEARS) {
+					// Google exports dates in miliseconds. This way we only lose the first year of UNIX Epoch.
+					// This is invalid once we hit 2970. So, quite a long time.
+					$added->setTimestamp((int)($attributes['add_date'] / 1000));
+				} else {
+					$added->setTimestamp((int)$attributes['add_date']);
+				}
 				$attributes['add_date'] = $added;
 			}
 			if (isset($attributes['last_modified'])) {
 				$modified = new DateTime();
-				$modified->setTimestamp((int)$attributes['last_modified']);
+				$modified->setTimestamp($attributes['last_modified'] instanceof DateTime ? $attributes['last_modified']->getTimestamp() : (int)$attributes['last_modified']);
 				$attributes['last_modified'] = $modified;
 			}
 		}
@@ -289,7 +298,7 @@ class BookmarksParser {
 	private function getCurrentFolderTags(): array {
 		$tags = [];
 		array_walk_recursive($this->currentFolder, static function ($tag, $key) use (&$tags) {
-			if ('name' === $key) {
+			if ($key === 'name') {
 				$tags[] = $tag;
 			}
 		});

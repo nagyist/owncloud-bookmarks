@@ -1,7 +1,7 @@
 <?php
 
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -33,7 +33,7 @@ class InternalBookmarkController extends ApiController {
 	private $bookmarks;
 
 	public function __construct(
-		$appName, $request, $userId, BookmarkController $publicController, BookmarkService $bookmarks, Authorizer $authorizer
+		$appName, $request, $userId, BookmarkController $publicController, BookmarkService $bookmarks, Authorizer $authorizer,
 	) {
 		parent::__construct($appName, $request);
 		$this->publicController = $publicController;
@@ -58,6 +58,7 @@ class InternalBookmarkController extends ApiController {
 	 * @param bool|null $unavailable
 	 * @param bool|null $archived
 	 * @param bool|null $duplicated
+	 * @param bool|null $deleted
 	 * @return DataResponse
 	 *
 	 * @NoAdminRequired
@@ -65,8 +66,8 @@ class InternalBookmarkController extends ApiController {
 	public function getBookmarks(
 		$page = 0,
 		$tags = [],
-		$conjunction = "or",
-		$sortby = "",
+		$conjunction = 'or',
+		$sortby = '',
 		$search = [],
 		$limit = 10,
 		$untagged = false,
@@ -74,9 +75,11 @@ class InternalBookmarkController extends ApiController {
 		$url = null,
 		$unavailable = null,
 		$archived = null,
-		$duplicated = null
+		$duplicated = null,
+		bool $recursive = false,
+		bool $deleted = false,
 	): DataResponse {
-		return $this->publicController->getBookmarks($page, $tags, $conjunction, $sortby, $search, $limit, $untagged, $folder, $url, $unavailable, $archived, $duplicated);
+		return $this->publicController->getBookmarks($page, $tags, $conjunction, $sortby, $search, $limit, $untagged, $folder, $url, $unavailable, $archived, $duplicated, $recursive, $deleted);
 	}
 
 	/**
@@ -95,12 +98,13 @@ class InternalBookmarkController extends ApiController {
 	 * @param string $description
 	 * @param array $tags
 	 * @param array $folders
+	 * @param string $target
 	 * @return JSONResponse
 	 *
 	 * @NoAdminRequired
 	 */
-	public function newBookmark($url = "", $title = null, $description = null, $tags = null, $folders = []): JSONResponse {
-		return $this->publicController->newBookmark($url, $title, $description, $tags, $folders);
+	public function newBookmark($url = '', $title = null, $description = null, $tags = null, $folders = [], $target = null): JSONResponse {
+		return $this->publicController->newBookmark($url, $title, $description, $tags, $folders, $target);
 	}
 
 	/**
@@ -110,12 +114,13 @@ class InternalBookmarkController extends ApiController {
 	 * @param string $description
 	 * @param array $tags
 	 * @param array|null $folders
+	 * @param string|null $target
 	 * @return JSONResponse
 	 *
 	 * @NoAdminRequired
 	 */
-	public function editBookmark($id = null, $url = null, $title = null, $description = "", $tags = [], $folders = null): JSONResponse {
-		return $this->publicController->editBookmark($id, $url, $title, $description, $tags, $folders);
+	public function editBookmark($id = null, $url = null, $title = null, $description = '', $tags = [], $folders = null, $target = null): JSONResponse {
+		return $this->publicController->editBookmark($id, $url, $title, $description, $tags, $folders, $target);
 	}
 
 	/**
@@ -136,7 +141,7 @@ class InternalBookmarkController extends ApiController {
 	public function deleteAllBookmarks(): DataResponse {
 		try {
 			$this->bookmarks->deleteAll($this->userId);
-		} catch (UnsupportedOperation | DoesNotExistException | MultipleObjectsReturnedException $e) {
+		} catch (UnsupportedOperation|DoesNotExistException|MultipleObjectsReturnedException $e) {
 			return new DataResponse(['status' => 'error', 'data' => ['Internal server error']], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 		return new DataResponse(['status' => 'success']);
@@ -148,7 +153,7 @@ class InternalBookmarkController extends ApiController {
 	 * @return JSONResponse
 	 * @NoAdminRequired
 	 */
-	public function clickBookmark($url = ""): JSONResponse {
+	public function clickBookmark($url = ''): JSONResponse {
 		return $this->publicController->clickBookmark($url);
 	}
 
@@ -206,7 +211,6 @@ class InternalBookmarkController extends ApiController {
 	 * @return JSONResponse
 	 *
 	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 */
 	public function countBookmarks(int $folder): JSONResponse {
 		return $this->publicController->countBookmarks($folder);
@@ -217,7 +221,6 @@ class InternalBookmarkController extends ApiController {
 	 * @return JSONResponse
 	 *
 	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 */
 	public function countUnavailable(): JSONResponse {
 		return $this->publicController->countUnavailable();
@@ -228,7 +231,6 @@ class InternalBookmarkController extends ApiController {
 	 * @return JSONResponse
 	 *
 	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 */
 	public function countArchived(): JSONResponse {
 		return $this->publicController->countArchived();
@@ -239,7 +241,6 @@ class InternalBookmarkController extends ApiController {
 	 * @return JSONResponse
 	 *
 	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 */
 	public function countDuplicated(): JSONResponse {
 		return $this->publicController->countDuplicated();
@@ -248,7 +249,6 @@ class InternalBookmarkController extends ApiController {
 	/**
 	 * @return JSONResponse
 	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 */
 	public function acquireLock(): JSONResponse {
 		return $this->publicController->acquireLock();
@@ -257,9 +257,32 @@ class InternalBookmarkController extends ApiController {
 	/**
 	 * @return JSONResponse
 	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 */
 	public function releaseLock(): JSONResponse {
 		return $this->publicController->releaseLock();
+	}
+
+	/**
+	 * @return Http\DataResponse
+	 * @NoAdminRequired
+	 */
+	public function getDeletedBookmarks(): DataResponse {
+		return $this->publicController->getDeletedBookmarks();
+	}
+
+	/**
+	 * @return Http\DataResponse
+	 * @NoAdminRequired
+	 */
+	public function countAllClicks(): DataResponse {
+		return $this->publicController->countAllClicks();
+	}
+
+	/**
+	 * @return Http\DataResponse
+	 * @NoAdminRequired
+	 */
+	public function countWithClicks(): DataResponse {
+		return $this->publicController->countWithClicks();
 	}
 }

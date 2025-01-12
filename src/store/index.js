@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -27,7 +27,10 @@ export default {
 		authToken: null,
 		fetchState: {
 			page: 0,
-			query: {},
+			query: {
+				// Set home filter to avoid trying to load *all* bookmark initially until onRoute is called
+				folder: -1,
+			},
 			reachedEnd: false,
 		},
 		loading: {
@@ -49,19 +52,23 @@ export default {
 			limit: 0,
 			backupPath: '',
 			backupEnabled: '1',
+			hasSeenWhatsnew: '',
 		},
 		bookmarks: [],
 		bookmarksById: {},
 		sharesById: {},
 		sharedFoldersById: {},
-		tags: [],
+		tags: null,
 		folders: [],
+		deletedFolders: null,
 		childrenByFolder: {},
 		tokensByFolder: {},
 		countsByFolder: {},
-		unavailableCount: 0,
-		archivedCount: 0,
-		duplicatedCount: 0,
+		unavailableCount: null,
+		archivedCount: null,
+		duplicatedCount: null,
+		allClicksCount: 0,
+		withClicksCount: 0,
 		selection: {
 			folders: [],
 			bookmarks: [],
@@ -89,14 +96,18 @@ export default {
 			if (Number(id) === -1) {
 				return [{ id: -1, children: state.folders }]
 			}
-			return findFolder(id, state.folders)
+			const folders = findFolder(id, state.folders)
+			if (folders.length) {
+				return folders
+			}
+			return findFolder(id, state.deletedFolders, true)
 		},
 		getFolderChildren: state => id => {
 			return state.childrenByFolder[id] || []
 		},
 		getSharesOfFolder: state => folderId => {
 			return Object.values(state.sharesById).filter(
-				share => share.folderId === folderId
+				share => share.folderId === folderId,
 			)
 		},
 		getTokenOfFolder: state => folderId => {

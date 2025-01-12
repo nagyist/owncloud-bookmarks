@@ -6,6 +6,8 @@ on:
     branches:
       - master
       - stable*
+    paths:
+      - 'lib/**'
 
 env:
   APP_NAME: bookmarks
@@ -21,13 +23,10 @@ jobs:
       # do not stop on another job's failure
       fail-fast: false
       matrix:
-        php-versions: ['7.4']
+        php-versions: ['8.1']
         databases: ['sqlite', 'mysql', 'pgsql']
-        server-versions: ['stable25']
-        prev-version: ['stable11']
-        exclude:
-          - prev-version: stable10
-            server-versions: stable25
+        server-versions: ['stable30']
+        prev-version: ['stable14']
 
     name: Update from ${{ matrix.prev-version }} on ${{ matrix.databases }}-${{ matrix.server-versions }}
 

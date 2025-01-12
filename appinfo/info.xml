@@ -3,27 +3,27 @@
 	  xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
 	<id>bookmarks</id>
 	<name>Bookmarks</name>
-	<summary>A Bookmark manager for Nextcloud</summary>
+	<summary>Collect and manage bookmarks, synced with all your devices</summary>
 	<description><![CDATA[
 - 📂 Sort bookmarks into folders
 - 🏷 Add tags and personal notes
-- 🔍 Full-text search
+- ☠ Find broken links and duplicates
 - 📲 Synchronize with all your browsers and devices
-- 👪 Share bookmarks with other users and publicly
-- ☠ Find broken links
+- 📔 Store archived versions of your links in case they are depublished
+- 🔍 Full-text search on site contents
+- 👪 Share bookmarks with other users and via public links
 - ⚛ Generate RSS feeds of your collections
-- 📔 Read archived versions of your links in case they are depublished
-- 💬 Create new bookmarks directly from within Nextcloud Talk
+- 📈 Stats on how often you access which links
+- 🔒 Automatic backups of your bookmarks collection
 - 💼 Built-in Dashboard widgets for frequent and recent links
 
 Requirements:
- - PHP v7.4+
  - PHP extensions:
    - intl: *
    - mbstring: *
  - when using MySQL, use at least v8.0
 ]]></description>
-	<version>12.0.0</version>
+	<version>15.0.4</version>
 	<licence>agpl</licence>
 	<author mail="mklehr@gmx.net">Marcel Klehr</author>
 	<author mail="blizzz@arthur-schiwon.de" homepage="https://www.arthur-schiwon.de">Arthur Schiwon</author>
@@ -36,13 +36,13 @@ Requirements:
 	<screenshot small-thumbnail="https://raw.githubusercontent.com/nextcloud/bookmarks/master/screenshots/Bookmarks-small.png">https://raw.githubusercontent.com/nextcloud/bookmarks/master/screenshots/Bookmarks.png</screenshot>
 
 	<dependencies>
-		<php min-version="7.4" />
+		<php min-version="8.1" />
 		<database>sqlite</database>
 		<database min-version="8.0">mysql</database>
 		<database>pgsql</database>
 		<lib>intl</lib>
 		<lib>mbstring</lib>
-		<nextcloud min-version="25" max-version="25" />
+		<nextcloud min-version="30" max-version="30" />
 	</dependencies>
 	<background-jobs>
 		<job>OCA\Bookmarks\BackgroundJobs\CrawlJob</job>

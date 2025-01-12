@@ -5,13 +5,13 @@
   -->
 
 <template>
-	<div v-if="isActive && hasMinLength && !archivedFile" class="bookmark-content">
+	<div v-if="isActive && scrapingEnabled && archiveEnabled && hasMinLength && !archivedFile && isWebLink" class="bookmark-content">
 		<div v-if="bookmark.textContent" class="content" v-html="content" />
 		<div v-else>
-			<NcEmptyContent :title="t('bookmarks', 'Content pending')"
+			<NcEmptyContent :name="t('bookmarks', 'Content pending')"
 				:description="t('bookmarks', 'This content is being downloaded for offline use. Please check back later.')">
 				<template #icon>
-					<DownloadIcon />
+					<DownloadIcon :size="20" />
 				</template>
 			</NcEmptyContent>
 		</div>
@@ -19,7 +19,7 @@
 </template>
 
 <script>
-import DownloadIcon from 'vue-material-design-icons/Download.vue'
+import { DownloadIcon } from './Icons.js'
 import sanitizeHtml from 'sanitize-html'
 import { generateUrl, generateRemoteUrl } from '@nextcloud/router'
 import { NcEmptyContent } from '@nextcloud/vue'
@@ -33,6 +33,15 @@ export default {
 		isActive() {
 			if (!this.$store.state.sidebar) return false
 			return this.$store.state.sidebar.type === 'bookmark'
+		},
+		isWebLink() {
+			return this.bookmark.url.startsWith('http')
+		},
+		scrapingEnabled() {
+			return this.$store.state.settings['privacy.enableScraping']
+		},
+		archiveEnabled() {
+			return this.$store.state.settings['archive.enabled']
 		},
 		bookmark() {
 			if (!this.isActive) return
@@ -69,7 +78,7 @@ export default {
 	right: max( min(27vw, 500px), 300px); /* side bar */
 	bottom: 0;
 	background: var(--color-main-background);
-	z-index: 1999;
+	z-index: 1801;
 	display: flex;
 	overflow: scroll;
 	flex-direction: column;
@@ -89,6 +98,11 @@ export default {
 	position: relative;
 	overflow: hidden;
 	width: auto;
+}
+
+.bookmark-content .empty-content {
+	margin: 150px auto;
+	width: 600px;
 }
 
 .bookmark-content .content iframe {

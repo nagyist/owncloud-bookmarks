@@ -1,6 +1,7 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -25,48 +26,12 @@ use OCA\Bookmarks\Exception\UnsupportedOperation;
 use OCA\Bookmarks\Exception\UserLimitExceededError;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
+use OCP\DB\Exception;
 use OCP\EventDispatcher\IEventDispatcher;
 use OCP\IGroupManager;
-use OCP\IL10N;
 use OCP\Share\IShare;
 
 class FolderService {
-	/**
-	 * @var FolderMapper
-	 */
-	private $folderMapper;
-	/**
-	 * @var TreeMapper
-	 */
-	private $treeMapper;
-	/**
-	 * @var ShareMapper
-	 */
-	private $shareMapper;
-	/**
-	 * @var SharedFolderMapper
-	 */
-	private $sharedFolderMapper;
-	/**
-	 * @var PublicFolderMapper
-	 */
-	private $publicFolderMapper;
-	/**
-	 * @var IGroupManager
-	 */
-	private $groupManager;
-	/**
-	 * @var HtmlImporter
-	 */
-	private $htmlImporter;
-	/**
-	 * @var IL10N
-	 */
-	private $l10n;
-	/**
-	 * @var IEventDispatcher
-	 */
-	private $eventDispatcher;
 
 	/**
 	 * FolderService constructor.
@@ -78,19 +43,19 @@ class FolderService {
 	 * @param PublicFolderMapper $publicFolderMapper
 	 * @param IGroupManager $groupManager
 	 * @param HtmlImporter $htmlImporter
-	 * @param IL10N $l10n
 	 * @param IEventDispatcher $eventDispatcher
 	 */
-	public function __construct(FolderMapper $folderMapper, TreeMapper $treeMapper, ShareMapper $shareMapper, SharedFolderMapper $sharedFolderMapper, PublicFolderMapper $publicFolderMapper, IGroupManager $groupManager, HtmlImporter $htmlImporter, IL10N $l10n, IEventDispatcher $eventDispatcher) {
-		$this->folderMapper = $folderMapper;
-		$this->treeMapper = $treeMapper;
-		$this->shareMapper = $shareMapper;
-		$this->sharedFolderMapper = $sharedFolderMapper;
-		$this->publicFolderMapper = $publicFolderMapper;
-		$this->groupManager = $groupManager;
-		$this->htmlImporter = $htmlImporter;
-		$this->l10n = $l10n;
-		$this->eventDispatcher = $eventDispatcher;
+	public function __construct(
+		private FolderMapper $folderMapper,
+		private TreeMapper $treeMapper,
+		private ShareMapper $shareMapper,
+		private SharedFolderMapper $sharedFolderMapper,
+		private PublicFolderMapper $publicFolderMapper,
+		private IGroupManager $groupManager,
+		private HtmlImporter $htmlImporter,
+		private IEventDispatcher $eventDispatcher,
+		private CirclesService $circlesService,
+	) {
 	}
 
 	public function getRootFolder(string $userId) : Folder {
@@ -112,11 +77,9 @@ class FolderService {
 	 * @throws DoesNotExistException
 	 * @throws MultipleObjectsReturnedException
 	 * @throws UnsupportedOperation
+	 * @throws Exception
 	 */
 	public function create($title, $parentFolderId): Folder {
-		/**
-		 * @var $parentFolder Folder
-		 */
 		$parentFolder = $this->folderMapper->find($parentFolderId);
 		$folder = new Folder();
 		$folder->setTitle($title);
@@ -125,7 +88,7 @@ class FolderService {
 		$this->folderMapper->insert($folder);
 		$this->treeMapper->move(TreeMapper::TYPE_FOLDER, $folder->getId(), $parentFolderId);
 
-		$this->eventDispatcher->dispatch(CreateEvent::class, new CreateEvent(TreeMapper::TYPE_FOLDER, $folder->getId()));
+		$this->eventDispatcher->dispatchTyped(new CreateEvent(TreeMapper::TYPE_FOLDER, $folder->getId()));
 		return $folder;
 	}
 
@@ -135,9 +98,6 @@ class FolderService {
 	 * @return Share|null
 	 */
 	public function findShareByDescendantAndUser(Folder $folder, $userId): ?Share {
-		/**
-		 * @var $shares Share[]
-		 */
 		$shares = $this->shareMapper->findByOwnerAndUser($folder->getUserId(), $userId);
 		foreach ($shares as $share) {
 			if ($share->getFolderId() === $folder->getId() || $this->treeMapper->hasDescendant($share->getFolderId(), TreeMapper::TYPE_FOLDER, $folder->getId())) {
@@ -154,19 +114,13 @@ class FolderService {
 	 * @throws DoesNotExistException
 	 * @throws MultipleObjectsReturnedException
 	 */
-	public function findSharedFolderOrFolder($userId, $folderId) {
-		/**
-		 * @var $folder Folder
-		 */
+	public function findSharedFolderOrFolder($userId, $folderId): Folder|SharedFolder {
 		$folder = $this->folderMapper->find($folderId);
 		if ($userId === null || $userId === $folder->getUserId()) {
 			return $folder;
 		}
 
 		try {
-			/**
-			 * @var $sharedFolder SharedFolder
-			 */
 			$sharedFolder = $this->sharedFolderMapper->findByFolderAndUser($folder->getId(), $userId);
 			return $sharedFolder;
 		} catch (DoesNotExistException $e) {
@@ -177,38 +131,45 @@ class FolderService {
 	}
 
 	/**
-	 * @param $userId
-	 * @param $folderId
+	 * @param string $userId
+	 * @param int $folderId
 	 * @throws DoesNotExistException
 	 * @throws MultipleObjectsReturnedException
 	 * @throws UnsupportedOperation
+	 * @throws Exception
 	 */
-	public function deleteSharedFolderOrFolder($userId, $folderId): void {
-		/**
-		 * @var $folder Folder
-		 */
+	public function deleteSharedFolderOrFolder(?string $userId, int $folderId, bool $hardDelete): void {
 		$folder = $this->folderMapper->find($folderId);
 
 		if ($userId === null || $userId === $folder->getUserId()) {
-			$this->treeMapper->deleteEntry(TreeMapper::TYPE_FOLDER, $folder->getId());
+			if ($hardDelete) {
+				$this->treeMapper->deleteEntry(TreeMapper::TYPE_FOLDER, $folder->getId());
+			} else {
+				$this->treeMapper->softDeleteEntry(TreeMapper::TYPE_FOLDER, $folder->getId());
+			}
 			return;
 		}
 
 		try {
 			// folder is shared folder
-			/**
-			 * @var $sharedFolder SharedFolder
-			 */
 			$sharedFolder = $this->sharedFolderMapper->findByFolderAndUser($folder->getId(), $userId);
-			$this->treeMapper->deleteEntry(TreeMapper::TYPE_SHARE, $sharedFolder->getId());
+			if ($hardDelete) {
+				$this->treeMapper->deleteEntry(TreeMapper::TYPE_SHARE, $sharedFolder->getId());
+			} else {
+				$this->treeMapper->softDeleteEntry(TreeMapper::TYPE_SHARE, $sharedFolder->getId());
+			}
 			return;
 		} catch (DoesNotExistException $e) {
 			// noop
 		}
 
 		// folder is subfolder of share
-		$this->treeMapper->deleteEntry(TreeMapper::TYPE_FOLDER, $folder->getId());
-		$this->folderMapper->delete($folder);
+		if ($hardDelete) {
+			$this->treeMapper->deleteEntry(TreeMapper::TYPE_FOLDER, $folder->getId());
+			$this->folderMapper->delete($folder);
+		} else {
+			$this->treeMapper->softDeleteEntry(TreeMapper::TYPE_FOLDER, $folder->getId());
+		}
 	}
 
 	/**
@@ -216,13 +177,39 @@ class FolderService {
 	 * @throws DoesNotExistException
 	 * @throws MultipleObjectsReturnedException
 	 * @throws UnsupportedOperation
+	 * @throws Exception
 	 */
 	public function deleteShare($shareId): void {
 		$this->treeMapper->deleteShare($shareId);
 	}
 
 	/**
-	 * @param string $userId
+	 * @throws UnsupportedOperation
+	 * @throws MultipleObjectsReturnedException
+	 * @throws DoesNotExistException|Exception
+	 */
+	public function undelete(?string $userId, int $folderId): void {
+		$folder = $this->folderMapper->find($folderId);
+		if ($userId === null || $userId === $folder->getUserId()) {
+			$this->treeMapper->softUndeleteEntry(TreeMapper::TYPE_FOLDER, $folderId);
+			return;
+		}
+
+		try {
+			// folder is shared folder
+			$sharedFolder = $this->sharedFolderMapper->findByFolderAndUser($folder->getId(), $userId);
+			$this->treeMapper->softUndeleteEntry(TreeMapper::TYPE_SHARE, $sharedFolder->getId());
+			return;
+		} catch (DoesNotExistException $e) {
+			// noop
+		}
+
+		// folder is subfolder of share
+		$this->treeMapper->softUndeleteEntry(TreeMapper::TYPE_FOLDER, $folder->getId());
+	}
+
+	/**
+	 * @param string|null $userId
 	 * @param int $folderId
 	 * @param string $title
 	 * @param int $parent_folder
@@ -231,19 +218,14 @@ class FolderService {
 	 * @throws MultipleObjectsReturnedException
 	 * @throws UnsupportedOperation
 	 * @throws \OCA\Bookmarks\Exception\UrlParseError
+	 * @throws Exception
 	 */
-	public function updateSharedFolderOrFolder($userId, $folderId, $title = null, $parent_folder = null) {
-		/**
-		 * @var $folder Folder
-		 */
+	public function updateSharedFolderOrFolder(?string $userId, int $folderId, ?string $title = null, ?int $parent_folder = null) {
 		$folder = $this->folderMapper->find($folderId);
 
 		if ($userId !== null || $userId !== $folder->getUserId()) {
 			try {
 				// folder is shared folder
-				/**
-				 * @var $sharedFolder SharedFolder
-				 */
 				$sharedFolder = $this->sharedFolderMapper->findByFolderAndUser($folder->getId(), $userId);
 				if (isset($title)) {
 					$sharedFolder->setTitle($title);
@@ -260,12 +242,14 @@ class FolderService {
 		if (isset($title)) {
 			$folder->setTitle($title);
 			$this->folderMapper->update($folder);
-			$this->eventDispatcher->dispatch(UpdateEvent::class, new UpdateEvent(TreeMapper::TYPE_FOLDER, $folder->getId()));
+			$this->eventDispatcher->dispatchTyped(new UpdateEvent(TreeMapper::TYPE_FOLDER, $folder->getId()));
 		}
 		if (isset($parent_folder)) {
-			/** @var Folder $parentFolder */
 			$parentFolder = $this->folderMapper->find($parent_folder);
 			if ($parentFolder->getUserId() !== $folder->getUserId()) {
+				if ($this->treeMapper->containsFoldersSharedToUser($folder, $parentFolder->getUserId())) {
+					throw new UnsupportedOperation('Cannot move a folder by user A into a folder shared from user B if it already contains folders shared with B.');
+				}
 				$this->treeMapper->changeFolderOwner($folder, $parentFolder->getUserId());
 			}
 			$this->treeMapper->move(TreeMapper::TYPE_FOLDER, $folder->getId(), $parent_folder);
@@ -283,7 +267,6 @@ class FolderService {
 	public function createFolderPublicToken($folderId): string {
 		$this->folderMapper->find($folderId);
 		try {
-			/** @var PublicFolder $publicFolder */
 			$publicFolder = $this->publicFolderMapper->findByFolder($folderId);
 		} catch (DoesNotExistException $e) {
 			$publicFolder = new PublicFolder();
@@ -297,6 +280,7 @@ class FolderService {
 	 * @param $folderId
 	 * @throws DoesNotExistException
 	 * @throws MultipleObjectsReturnedException
+	 * @throws Exception
 	 */
 	public function deleteFolderPublicToken($folderId): void {
 		$publicFolder = $this->publicFolderMapper->findByFolder($folderId);
@@ -313,53 +297,101 @@ class FolderService {
 	 * @throws DoesNotExistException
 	 * @throws MultipleObjectsReturnedException
 	 * @throws UnsupportedOperation
+	 * @throws Exception
 	 */
-	public function createShare($folderId, $participant, int $type, $canWrite = false, $canShare = false): Share {
-		/**
-		 * @var $folder Folder
-		 */
+	public function createShare($folderId, $participant, int $type, bool $canWrite = false, bool $canShare = false): Share {
 		$folder = $this->folderMapper->find($folderId);
 
 		$share = new Share();
 		$share->setFolderId($folderId);
 		$share->setOwner($folder->getUserId());
 		$share->setParticipant($participant);
-		if ($type !== IShare::TYPE_USER && $type !== IShare::TYPE_GROUP) {
-			throw new UnsupportedOperation('Only users and groups are allowed as participants');
-		}
 		$share->setType($type);
 		$share->setCanWrite($canWrite);
 		$share->setCanShare($canShare);
-		$this->shareMapper->insert($share);
 
 		if ($type === IShare::TYPE_USER) {
 			if ($participant === $folder->getUserId()) {
 				throw new UnsupportedOperation('Cannot share with oneself');
 			}
+			// If this folder already contains a share from this user, don't share it back. Would cause a loop.
+			if ($this->treeMapper->containsSharedFolderFromUser($folder, $participant)) {
+				throw new UnsupportedOperation('Cannot share this with user that shared some of its contents');
+			}
+			$this->shareMapper->insert($share);
 			$this->addSharedFolder($share, $folder, $participant);
-		} elseif ($type === IShare::TYPE_GROUP) {
+		} else {
+			$this->addSharedFolderForParticipant($share, $folder, $type, $participant);
+		}
+
+
+		return $share;
+	}
+
+	/**
+	 * @throws MultipleObjectsReturnedException
+	 * @throws UnsupportedOperation
+	 * @throws DoesNotExistException
+	 * @throws Exception
+	 */
+	public function addSharedFolderForParticipant(Share $share, Folder $folder, int $type, string $participant): void {
+		if ($type === IShare::TYPE_CIRCLE) {
+			$circle = $this->circlesService->getCircle($participant);
+			if ($circle === null) {
+				throw new DoesNotExistException('Circle does not exist');
+			}
+			$this->shareMapper->insert($share);
+
+			$members = $circle->getMembers();
+			foreach ($members as $member) {
+				$this->addSharedFolderForParticipant($share, $folder, $member->getUserType(), $member->getUserId());
+			}
+		}
+		if ($type === IShare::TYPE_GROUP) {
 			$group = $this->groupManager->get($participant);
 			if ($group === null) {
-				throw new DoesNotExistException('Group does not exist');
+				return;
 			}
+			$this->shareMapper->insert($share);
+
 			$users = $group->getUsers();
 			foreach ($users as $user) {
-				// If I'm part of the group, don't add it twice
+				// If owner is part of the group, don't add it twice
 				if ($user->getUID() === $folder->getUserId()) {
 					continue;
 				}
 				// If this folder is already shared with the user, don't add it twice.
-				try {
-					$this->sharedFolderMapper->findByFolderAndUser($folder->getId(), $user->getUID());
+				if ($this->treeMapper->isFolderSharedWithUser($folder->getId(), $user->getUID())) {
 					continue;
-				} catch (DoesNotExistException $e) {
-					// do nothing
+				}
+
+				// If this folder already contains a share from this user, don't share it back. Would cause a loop.
+				if ($this->treeMapper->containsSharedFolderFromUser($folder, $user->getUID())) {
+					continue;
 				}
 
 				$this->addSharedFolder($share, $folder, $user->getUID());
 			}
 		}
-		return $share;
+		if ($type === IShare::TYPE_USER) {
+			// User is already owner of folder
+			if ($participant === $folder->getUserId()) {
+				return;
+			}
+			// If this folder is already shared with the user, don't add it twice.
+			if ($this->treeMapper->isFolderSharedWithUser($folder->getId(), $participant)) {
+				return;
+			}
+
+			// If this folder already contains a share from this user, don't share it back. Would cause a loop.
+			if ($this->treeMapper->containsSharedFolderFromUser($folder, $participant)) {
+				return;
+			}
+
+			$this->shareMapper->insert($share);
+
+			$this->addSharedFolder($share, $folder, $participant);
+		}
 	}
 
 	/**

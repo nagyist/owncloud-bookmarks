@@ -1,6 +1,7 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -65,11 +66,14 @@ class FaviconPreviewer implements IBookmarkPreviewer {
 	 *
 	 * @return Image|null
 	 */
-	public function getImage($bookmark): ?IImage {
+	public function getImage($bookmark, $cacheOnly = false): ?IImage {
 		if ($this->enabled === 'false') {
 			return null;
 		}
 		if (!isset($bookmark)) {
+			return null;
+		}
+		if (!$bookmark->isWebLink()) {
 			return null;
 		}
 		$key = self::CACHE_PREFIX . '-' . md5($bookmark->getUrl());
@@ -85,11 +89,15 @@ class FaviconPreviewer implements IBookmarkPreviewer {
 		} catch (NotPermittedException $e) {
 		}
 
+		if ($cacheOnly) {
+			return null;
+		}
+
 		$url = $bookmark->getUrl();
 		$site = $this->scrapeUrl($url);
 
-		if (isset($site['favicon'])) {
-			$image = $this->fetchImage($site['favicon']);
+		if (isset($site['image']['favicon'])) {
+			$image = $this->fetchImage($site['image']['favicon']);
 			if ($image !== null) {
 				$this->cache->set($key, $image->serialize(), self::CACHE_TTL);
 				return $image;
@@ -131,7 +139,7 @@ class FaviconPreviewer implements IBookmarkPreviewer {
 		$contentType = $response->getHeader('Content-Type');
 
 		// Some HTPP Error occured :/
-		if (200 !== $response->getStatusCode()) {
+		if ($response->getStatusCode() !== 200) {
 			return null;
 		}
 

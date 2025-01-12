@@ -3,7 +3,6 @@ OC.L10N.register(
     {
     "Rename" : "﻿ಮರುಹೆಸರಿಸು",
     "Move" : "Move",
-    "Delete" : "﻿ಅಳಿಸಿ",
     "Select all" : "﻿ಎಲ್ಲಾ ಆಯ್ಕೆ ಮಾಡಿ",
     "New" : "﻿ಹೊಸ",
     "New folder" : "﻿ಹೊಸ ಕೋಶ",
@@ -11,8 +10,7 @@ OC.L10N.register(
     "Cancel" : "﻿ರದ್ದು",
     "Shared with you" : "Shared with you",
     "Files" : "ಕಡತಗಳು",
-    "Import" : "ಆಮದು",
-    "Export" : "ರಫ್ತು",
+    "Delete" : "﻿ಅಳಿಸಿ",
     "Title" : "ಶೀರ್ಷಿಕೆ",
     "Link" : "ಸಂಪರ್ಕ ಕೊಂಡಿ",
     "Notes" : "Notes",
