@@ -1,5 +1,5 @@
 <!--
-  - Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+  - Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
   -
   - This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
   -->
@@ -7,7 +7,7 @@
 <template>
 	<Item :active="selected"
 		:editable="isEditable"
-		:draggable="isEditable"
+		:draggable="isDraggable"
 		:selected="selected"
 		:title="folder.title"
 		:renaming="renaming"
@@ -21,8 +21,12 @@
 		@rename-cancel="renaming = false"
 		@click="onSelect">
 		<template #icon>
-			<FolderIcon :fill-color="colorPrimaryElement" :class="'folder__icon'" @click="onSelect" />
+			<FolderIcon :size="20"
+				:fill-color="colorPrimaryElement"
+				:class="'folder__icon'"
+				@click="onSelect" />
 			<ShareVariantIcon v-if="(isShared || !isOwner) || isSharedPublicly"
+				:size="20"
 				:fill-color="colorPrimaryText"
 				:class="['folder__icon', 'shared']" />
 		</template>
@@ -34,58 +38,69 @@
 		<template #tags>
 			<div class="folder__tags">
 				<div v-if="!isOwner && !isSharedPublicly" class="folder__tag">
-					{{ t('bookmarks', 'Shared by {user}', {user: folder.userId}) }}
+					{{ t('bookmarks', 'Shared by {user}', {user: folder.userDisplayName}) }}
 				</div>
 			</div>
 		</template>
 		<template #actions>
-			<NcActionButton :close-after-click="true" @click="onDetails">
-				<template #icon>
-					<InformationVariantIcon />
-				</template>
-				{{ t('bookmarks', 'Details') }}
-			</NcActionButton>
-			<NcActionCheckbox @change="clickSelect">
-				{{ t('bookmarks', 'Select folder') }}
-			</NcActionCheckbox>
-			<NcActionButton v-if="permissions.canShare"
-				icon="icon-share"
-				:close-after-click="true"
-				@click="onShare">
-				<template #icon>
-					<ShareVariantIcon />
-				</template>
-				{{ t('bookmarks', 'Share folder') }}
-			</NcActionButton>
-			<NcActionButton :close-after-click="true" @click="onRename">
-				<template #icon>
-					<PencilIcon />
-				</template>
-				{{ t('bookmarks', 'Rename folder') }}
-			</NcActionButton>
-			<NcActionButton :close-after-click="true" @click="onMove">
-				<template #icon>
-					<FolderMoveIcon :fill-color="colorMainText" />
-				</template>
-				{{ t('bookmarks', 'Move folder') }}
-			</NcActionButton>
-			<NcActionButton :close-after-click="true" @click="onDelete">
-				<template #icon>
-					<DeleteIcon />
-				</template>
-				{{ t('bookmarks', 'Delete folder') }}
-			</NcActionButton>
+			<template v-if="!isTrashbin">
+				<NcActionButton :close-after-click="true" @click="onDetails">
+					<template #icon>
+						<InformationVariantIcon :size="20" />
+					</template>
+					{{ t('bookmarks', 'Details') }}
+				</NcActionButton>
+				<NcActionCheckbox @change="clickSelect">
+					{{ t('bookmarks', 'Select folder') }}
+				</NcActionCheckbox>
+				<NcActionButton v-if="permissions.canShare"
+					icon="icon-share"
+					:close-after-click="true"
+					@click="onShare">
+					<template #icon>
+						<ShareVariantIcon :size="20" />
+					</template>
+					{{ t('bookmarks', 'Share folder') }}
+				</NcActionButton>
+				<NcActionButton :close-after-click="true" @click="onRename">
+					<template #icon>
+						<PencilIcon :size="20" />
+					</template>
+					{{ t('bookmarks', 'Rename folder') }}
+				</NcActionButton>
+				<NcActionButton :close-after-click="true" @click="onMove">
+					<template #icon>
+						<FolderMoveIcon :size="20" :fill-color="colorMainText" />
+					</template>
+					{{ t('bookmarks', 'Move folder') }}
+				</NcActionButton>
+				<NcActionButton :close-after-click="true" @click="onDelete(false)">
+					<template #icon>
+						<DeleteIcon :size="20" />
+					</template>
+					{{ t('bookmarks', 'Put folder into trashbin') }}
+				</NcActionButton>
+			</template>
+			<template v-else>
+				<NcActionButton :close-after-click="true" @click="onUndelete">
+					<template #icon>
+						<UndeleteIcon :size="20" />
+					</template>
+					{{ t('bookmarks', 'Restore folder') }}
+				</NcActionButton>
+				<NcActionButton :close-after-click="true" @click="onDelete(true)">
+					<template #icon>
+						<DeleteForeverIcon :size="20" />
+					</template>
+					{{ t('bookmarks', 'Delete folder permanently') }}
+				</NcActionButton>
+			</template>
 		</template>
 	</Item>
 </template>
 <script>
 import { getCurrentUser } from '@nextcloud/auth'
-import FolderMoveIcon from 'vue-material-design-icons/FolderMove.vue'
-import FolderIcon from 'vue-material-design-icons/Folder.vue'
-import ShareVariantIcon from 'vue-material-design-icons/ShareVariant.vue'
-import DeleteIcon from 'vue-material-design-icons/Delete.vue'
-import PencilIcon from 'vue-material-design-icons/Pencil.vue'
-import InformationVariantIcon from 'vue-material-design-icons/InformationVariant.vue'
+import { UndeleteIcon, DeleteForeverIcon, FolderMoveIcon, FolderIcon, ShareVariantIcon, DeleteIcon, PencilIcon, InformationVariantIcon } from './Icons.js'
 import { NcActionButton, NcActionCheckbox } from '@nextcloud/vue'
 import { actions, mutations } from '../store/index.js'
 import Item from './Item.vue'
@@ -100,6 +115,8 @@ export default {
 		FolderMoveIcon,
 		ShareVariantIcon,
 		DeleteIcon,
+		DeleteForeverIcon,
+		UndeleteIcon,
 		PencilIcon,
 		InformationVariantIcon,
 	},
@@ -123,11 +140,23 @@ export default {
 			const currentUser = getCurrentUser()
 			return currentUser && this.folder.userId === currentUser.uid
 		},
+		containingFolder() {
+			return this.$store.getters.getFolder(this.$store.state.fetchState.query.folder)[0]
+		},
+		isTrashbin() {
+			return (this.containingFolder && this.containingFolder.softDeleted) || this.$route.name === this.routes.TRASHBIN
+		},
 		permissions() {
 			return this.$store.getters.getPermissionsForFolder(this.folder.id)
 		},
+		isDirectShare() {
+			return this.$store.state.sharedFoldersById[this.folder.id] !== undefined
+		},
 		isEditable() {
-			return this.isOwner || (!this.isOwner && this.permissions.canWrite)
+			return this.isOwner || this.isDirectShare || this.permissions.canWrite
+		},
+		isDraggable() {
+			return this.isEditable && !this.isTrashbin
 		},
 		shares() {
 			return this.$store.getters.getSharesOfFolder(this.folder.id)
@@ -166,19 +195,28 @@ export default {
 		onShare() {
 			this.$store.dispatch(actions.OPEN_FOLDER_SHARING, this.folder.id)
 		},
-		onDelete() {
-			if (!confirm(t('bookmarks', 'Do you really want to delete this folder?'))) {
+		onDelete(hard) {
+			if (hard && !confirm(t('bookmarks', 'Do you really want to permanently delete this folder?'))) {
 				return
 			}
-			this.$store.dispatch(actions.DELETE_FOLDER, { id: this.folder.id })
+			this.$store.dispatch(actions.DELETE_FOLDER, { id: this.folder.id, hard })
+		},
+		onUndelete() {
+			this.$store.dispatch(actions.UNDELETE_FOLDER, { id: this.folder.id })
 		},
 		onMove() {
+			if (this.isTrashbin) {
+				return
+			}
 			this.$store.commit(mutations.RESET_SELECTION)
 			this.$store.commit(mutations.ADD_SELECTION_FOLDER, this.folder)
 			this.$store.commit(mutations.DISPLAY_MOVE_DIALOG, true)
 		},
 		onSelect(e) {
 			this.$router.push({ name: this.routes.FOLDER, params: { folder: this.folder.id } })
+			if (this.$store.state.sidebar && this.$store.state.sidebar.type === 'folder') {
+				this.$store.dispatch(actions.OPEN_FOLDER_DETAILS, this.folder.id)
+			}
 			e.preventDefault()
 		},
 		async onRename() {
@@ -191,24 +229,25 @@ export default {
 			this.renaming = false
 		},
 		clickSelect(e) {
+			if (this.isTrashbin) {
+				return
+			}
 			if (!this.selected) {
 				this.$store.commit(mutations.ADD_SELECTION_FOLDER, this.folder)
 			} else {
 				this.$store.commit(mutations.REMOVE_SELECTION_FOLDER, this.folder)
 			}
 		},
-		onEnter(e) {
-			if (e.key === 'Enter') {
-				this.onSelect(e)
-			}
-		},
 		allowDrop() {
-			return !this.$store.state.selection.folders.includes(this.folder) && (this.$store.state.selection.folders.length || this.$store.state.selection.bookmarks.length)
+			return !this.isTrashbin && !this.$store.state.selection.folders.includes(this.folder) && (this.$store.state.selection.folders.length || this.$store.state.selection.bookmarks.length)
 		},
 		async onDrop(e) {
 			e.preventDefault()
-			await this.$store.dispatch(actions.MOVE_SELECTION, this.folder.id)
-			this.$store.commit(mutations.RESET_SELECTION)
+			try {
+				await this.$store.dispatch(actions.MOVE_SELECTION, this.folder.id)
+			} finally {
+				this.$store.commit(mutations.RESET_SELECTION)
+			}
 		},
 	},
 }
@@ -226,10 +265,10 @@ export default {
 .folder__icon.shared {
 	transform: scale(0.4);
 	position: absolute;
-	top: 11px;
+	top: 0;
 	height: auto;
 	width: auto;
-	left: -2px;
+	left: -1px;
 }
 
 .item--gridview .folder__icon {
@@ -242,7 +281,7 @@ export default {
 }
 
 .item--gridview .folder__icon.shared {
-	transform: translate(87%, 110%) scale(1.5);
+	transform: translate(100%, 130%) scale(1.5);
 }
 
 .folder__title {
@@ -252,6 +291,8 @@ export default {
 	white-space: nowrap;
 	cursor: pointer;
 	margin: 0;
+	font-size: 1em;
+	font-weight: normal;
 }
 
 .item--gridview .folder__title {
@@ -280,6 +321,6 @@ export default {
 	border-radius: var(--border-radius-pill);
 	padding: 5px 10px;
 	margin-right: 3px;
-	background-color: var(--color-primary-light);
+	background-color: var(--color-primary-element-light);
 }
 </style>

@@ -1,5 +1,5 @@
 <!--
-  - Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+  - Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
   -
   - This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
   -->
@@ -71,20 +71,20 @@ export default {
 			const route = this.$route
 			switch (route.name) {
 			case this.routes.HOME:
-				return this.$store.dispatch(actions.FILTER_BY_FOLDER, '-1')
+				return this.$store.dispatch(actions.FILTER_BY_FOLDER, { folder: '-1' })
 			case this.routes.RECENT:
 				return this.$store.dispatch(actions.FILTER_BY_RECENT)
 			case this.routes.UNTAGGED:
 				return this.$store.dispatch(actions.FILTER_BY_UNTAGGED)
 			case this.routes.FOLDER:
-				return this.$store.dispatch(actions.FILTER_BY_FOLDER, route.params.folder)
+				return this.$store.dispatch(actions.FILTER_BY_FOLDER, { folder: route.params.folder })
 			case this.routes.TAGS:
 				return this.$store.dispatch(
 					actions.FILTER_BY_TAGS,
-					route.params.tags.split(',')
+					route.params.tags.split(','),
 				)
 			case this.routes.SEARCH:
-				return this.$store.dispatch(actions.FILTER_BY_SEARCH, route.params.search)
+				return this.$store.dispatch(actions.FILTER_BY_SEARCH, { search: route.params.search, folder: route.params.folder || -1 })
 			default:
 				throw new Error('Nothing here. Move along.')
 			}

@@ -1,13 +1,20 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
 
 namespace OCA\Bookmarks\Db;
 
+use OCA\Bookmarks\Service\CirclesService;
 use OCP\AppFramework\Db\Entity;
+use OCP\IGroupManager;
+use OCP\IUserManager;
+use OCP\Share\IShare;
+use Psr\Container\ContainerExceptionInterface;
+use Psr\Container\NotFoundExceptionInterface;
 
 /**
  * Class Share
@@ -55,9 +62,35 @@ class Share extends Entity {
 	/**
 	 * @return array
 	 *
-	 * @psalm-return array{id: mixed, folderId: mixed, owner: mixed, participant: mixed, type: mixed, canWrite: mixed, canShare: mixed, createdAt: mixed}
+	 * @psalm-return array{id: mixed, folderId: mixed, owner: mixed, participant: mixed, type: mixed, canWrite: mixed, canShare: mixed, createdAt: mixed, participantDisplayName: string}
 	 */
 	public function toArray(): array {
-		return ['id' => $this->id, 'folderId' => $this->folderId, 'owner' => $this->owner, 'participant' => $this->participant, 'type' => $this->type, 'canWrite' => $this->canWrite, 'canShare' => $this->canShare, 'createdAt' => $this->createdAt];
+		return [
+			'id' => $this->id,
+			'folderId' => $this->folderId,
+			'owner' => $this->owner,
+			'participant' => $this->participant,
+			'type' => $this->type,
+			'canWrite' => $this->canWrite,
+			'canShare' => $this->canShare,
+			'createdAt' => $this->createdAt,
+			'participantDisplayName' => self::getParticipantDisplayName($this->type, $this->participant),
+		];
+	}
+
+	private static function getParticipantDisplayName($type, $participant) {
+		try {
+			if ($type === IShare::TYPE_USER) {
+				return \OCP\Server::get(IUserManager::class)->get($participant)->getDisplayName();
+			}
+			if ($type === IShare::TYPE_GROUP) {
+				return \OCP\Server::get(IGroupManager::class)->get($participant)->getDisplayName();
+			}
+			if ($type === IShare::TYPE_CIRCLE) {
+				return \OCP\Server::get(CirclesService::class)->getCircle($participant)->getName();
+			}
+		} catch (NotFoundExceptionInterface|ContainerExceptionInterface $e) {
+			return $participant;
+		}
 	}
 }

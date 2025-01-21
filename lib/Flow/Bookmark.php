@@ -1,6 +1,7 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -104,7 +105,7 @@ class Bookmark implements IEntity, IUrl {
 		}
 		try {
 			$this->bookmark = $this->bookmarkMapper->find($event->getId());
-		} catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+		} catch (DoesNotExistException|MultipleObjectsReturnedException $e) {
 			return;
 		}
 		$ruleMatcher->setEntitySubject($this, $this->bookmark);

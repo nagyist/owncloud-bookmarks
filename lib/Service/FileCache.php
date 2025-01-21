@@ -1,6 +1,7 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -87,10 +88,10 @@ class FileCache implements ICache {
 	 * Returns the size of the stored/cached data
 	 *
 	 * @param string $key
-	 * @return int
-	 * @throws NotFoundException
+	 * @return int|float
+	 * @throws NotFoundException|NotPermittedException
 	 */
-	public function size($key): int {
+	public function size(string $key) {
 		$result = 0;
 		if ($this->hasKey($key)) {
 			$result = $this->getStorage()->getFile($key)->getSize();
@@ -131,7 +132,7 @@ class FileCache implements ICache {
 	 * @throws NotPermittedException
 	 */
 	public function remove($key) {
-		return (boolean) $this->getStorage()->getFile($key)->delete();
+		return (bool)$this->getStorage()->getFile($key)->delete();
 	}
 
 	/**

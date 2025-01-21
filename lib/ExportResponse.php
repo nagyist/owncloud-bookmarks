@@ -1,7 +1,7 @@
 <?php
 
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -12,6 +12,11 @@ use OC;
 use OC\HintException;
 use OCP\AppFramework\Http\Response;
 
+/**
+ * @psalm-template S of int
+ * @psalm-template H of array<string, mixed>
+ * @psalm-extends Response<S,H>
+ */
 class ExportResponse extends Response {
 	private $returnstring;
 
@@ -28,10 +33,10 @@ class ExportResponse extends Response {
 		$dateTime = OC::$server->getDateTimeFormatter();
 
 		$export_name = '"' . $productName . ' Bookmarks (' . $userName . ') (' . $dateTime->formatDate(time()) . ').html"';
-		$this->addHeader("Cache-Control", "private");
-		$this->addHeader("Content-Type", " application/stream");
-		$this->addHeader("Content-Length", strlen($returnstring));
-		$this->addHeader("Content-Disposition", "attachment; filename=" . $export_name);
+		$this->addHeader('Cache-Control', 'private');
+		$this->addHeader('Content-Type', ' application/stream');
+		$this->addHeader('Content-Length', strlen($returnstring));
+		$this->addHeader('Content-Disposition', 'attachment; filename=' . $export_name);
 		$this->returnstring = $returnstring;
 	}
 

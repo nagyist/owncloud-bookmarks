@@ -1,12 +1,11 @@
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
 
 import Vue from 'vue'
 import axios from '@nextcloud/axios'
-import { findFolder } from './findFolder.js'
 
 export const mutations = {
 	SET_AUTH_TOKEN: 'SET_AUTH_TOKEN',
@@ -27,6 +26,7 @@ export const mutations = {
 	SET_UNAVAILABLE_COUNT: 'SET_UNAVAILABLE_COUNT',
 	SET_ARCHIVED_COUNT: 'SET_ARCHIVED_COUNT',
 	SET_DUPLICATED_COUNT: 'SET_DUPLICATED_COUNT',
+	SET_ALL_CLICKS_COUNT: 'SET_ALL_CLICKS_COUNT',
 	ADD_TAG: 'ADD_TAG',
 	SET_TAGS: 'SET_TAGS',
 	RENAME_TAG: 'RENAME_TAG',
@@ -51,6 +51,10 @@ export const mutations = {
 	ADD_PUBLIC_TOKEN: 'ADD_PUBLIC_TOKEN',
 	REMOVE_PUBLIC_TOKEN: 'REMOVE_PUBLIC_TOKEN',
 	SET_FOLDER_CHILDREN_ORDER: 'SET_FOLDER_CHILDREN_ORDER',
+	SET_DELETED_FOLDERS: 'SET_DELETED_FOLDERS',
+	CLICK_BOOKMARK: 'CLICK_BOOKMARK',
+	SET_WITH_CLICKS_COUNT: 'SET_WITH_CLICKS_COUNT',
+	EMPTY_TRASHBIN: 'EMPTY_TRASHBIN',
 }
 export default {
 	[mutations.SET_AUTH_TOKEN](state, authToken) {
@@ -78,12 +82,18 @@ export default {
 	[mutations.SET_FOLDERS](state, folders) {
 		state.folders = sortFolders(folders)
 	},
+	[mutations.SET_DELETED_FOLDERS](state, folders) {
+		state.deletedFolders = sortFolders(folders)
+	},
+	[mutations.EMPTY_TRASHBIN](state) {
+		state.deletedFolders = []
+	},
 	[mutations.MOVE_FOLDER](state, { folder, target }) {
-		const currentFolder = findFolder(folder, state.folders)[0]
-		const oldParent = findFolder(currentFolder.parent_folder, state.folders)[0]
+		const currentFolder = this.getters.getFolder(folder)[0]
+		const oldParent = this.getters.getFolder(currentFolder.parent_folder)[0]
 		const index = oldParent.children.indexOf(currentFolder)
 		oldParent.children.splice(index, 1)
-		const newParent = findFolder(target, state.folders)[0]
+		const newParent = this.getters.getFolder(target)[0]
 		newParent.children.push(currentFolder)
 
 		if (state.childrenByFolder[oldParent.id]) {
@@ -148,7 +158,7 @@ export default {
 		Vue.set(
 			state.selection,
 			'bookmarks',
-			state.selection.bookmarks.filter(s => !(s.id === item.id))
+			state.selection.bookmarks.filter(s => !(s.id === item.id)),
 		)
 	},
 	[mutations.ADD_SELECTION_FOLDER](state, item) {
@@ -158,7 +168,7 @@ export default {
 		Vue.set(
 			state.selection,
 			'folders',
-			state.selection.folders.filter(s => !(s.id === item.id))
+			state.selection.folders.filter(s => !(s.id === item.id)),
 		)
 	},
 
@@ -167,6 +177,12 @@ export default {
 		if (!existingBookmark) {
 			state.bookmarks.push(bookmark)
 			Vue.set(state.bookmarksById, bookmark.id, bookmark)
+		}
+	},
+	[mutations.CLICK_BOOKMARK](state, bookmark) {
+		const existingBookmark = state.bookmarksById[bookmark.id]
+		if (existingBookmark) {
+			existingBookmark.clickcount += 1
 		}
 	},
 	[mutations.REMOVE_BOOKMARK](state, id) {
@@ -205,6 +221,12 @@ export default {
 	},
 	[mutations.SET_DUPLICATED_COUNT](state, count) {
 		state.duplicatedCount = count
+	},
+	[mutations.SET_ALL_CLICKS_COUNT](state, count) {
+		state.allClicksCount = count
+	},
+	[mutations.SET_WITH_CLICKS_COUNT](state, count) {
+		state.withClicksCount = count
 	},
 
 	[mutations.SET_SIDEBAR](state, sidebar) {
@@ -282,6 +304,9 @@ export default {
  * @param folders
  */
 function sortFolders(folders) {
+	if (!folders) {
+		return []
+	}
 	folders.forEach(folder => {
 		folder.children = sortFolders(folder.children)
 	})

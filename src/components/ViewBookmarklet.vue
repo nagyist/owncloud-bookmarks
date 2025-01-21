@@ -1,56 +1,58 @@
 <!--
-  - Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+  - Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
   -
   - This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
   -->
 
 <template>
 	<NcContent app-name="bookmarks">
-		<div class="bookmarklet">
-			<h2><figure :class="loading? 'icon-loading-small' : 'icon-link'" /> {{ t('bookmarks', 'Add a bookmark') }}</h2>
-			<div v-if="exists" class="bookmarklet__exists">
-				{{ t('bookmarks', 'This URL is already bookmarked! Overwrite?') }}
+		<NcAppContent>
+			<div class="bookmarklet">
+				<h2><figure :class="loading? 'icon-loading-small' : 'icon-link'" /> {{ t('bookmarks', 'Add a bookmark') }}</h2>
+				<div v-if="exists" class="bookmarklet__exists">
+					{{ t('bookmarks', 'This URL is already bookmarked! Overwrite?') }}
+				</div>
+				<label>{{ t('bookmarks', 'Title') }}
+					<input v-model="bookmark.title" type="text" :placeholder="t('bookmarks', 'Enter bookmark title')">
+				</label>
+				<label>{{ t('bookmarks', 'Link') }}
+					<input v-model="bookmark.url" type="text" :placeholder="t('bookmarks', 'Enter bookmark URL')">
+				</label>
+				<label><figure class="icon-tag" /> {{ t('bookmarks', 'Tags') }}
+					<NcSelect class="sidebar__tags"
+						:value="bookmark.tags"
+						:auto-limit="false"
+						:limit="7"
+						:options="allTags"
+						:multiple="true"
+						:taggable="true"
+						@input="onTagsChange"
+						@tag="onAddTag" />
+				</label>
+				<label><figure class="icon-folder" /> {{ t('bookmarks', 'Folder') }}
+					<input :value="folderTitle"
+						type="text"
+						readonly
+						:placeholder="t('bookmarks', 'Root Folder')"
+						@click="showPicker = true">
+					<FolderPickerDialog v-model="folder" :show="showPicker" @close="showPicker = false" />
+				</label>
+				<label>{{ t('bookmarks', 'Notes') }}</label>
+				<div class="bookmarklet__notes"
+					contenteditable
+					@input="onNotesChange">
+					{{ description }}
+				</div>
+				<button class="primary" @click="submit">
+					<span class="icon-confirm-white" />{{ t('bookmarks', 'Save') }}
+				</button>
 			</div>
-			<label>{{ t('bookmarks', 'Title') }}
-				<input v-model="bookmark.title" type="text" :placeholder="t('bookmarks', 'Enter bookmark title')">
-			</label>
-			<label>{{ t('bookmarks', 'Link') }}
-				<input v-model="bookmark.url" type="text" :placeholder="t('bookmarks', 'Enter bookmark URL')">
-			</label>
-			<label><figure class="icon-tag" /> {{ t('bookmarks', 'Tags') }}
-				<NcMultiselect class="sidebar__tags"
-					:value="bookmark.tags"
-					:auto-limit="false"
-					:limit="7"
-					:options="allTags"
-					:multiple="true"
-					:taggable="true"
-					@input="onTagsChange"
-					@tag="onAddTag" />
-			</label>
-			<label><figure class="icon-folder" /> {{ t('bookmarks', 'Folder') }}
-				<input :value="folderTitle"
-					type="text"
-					readonly
-					:placeholder="t('bookmarks', 'Root Folder')"
-					@click="showPicker = true">
-				<FolderPickerDialog v-model="folder" :show="showPicker" @close="showPicker = false" />
-			</label>
-			<label>{{ t('bookmarks', 'Notes') }}</label>
-			<div class="bookmarklet__notes"
-				contenteditable
-				@input="onNotesChange">
-				{{ description }}
-			</div>
-			<button class="primary" @click="submit">
-				<span class="icon-confirm-white" />{{ t('bookmarks', 'Save') }}
-			</button>
-		</div>
+		</NcAppContent>
 	</NcContent>
 </template>
 
 <script>
-import { NcContent, NcMultiselect } from '@nextcloud/vue'
+import { NcContent, NcAppContent, NcSelect } from '@nextcloud/vue'
 import { actions } from '../store/index.js'
 import FolderPickerDialog from './FolderPickerDialog.vue'
 
@@ -59,7 +61,8 @@ export default {
 	components: {
 		FolderPickerDialog,
 		NcContent,
-		NcMultiselect,
+		NcSelect,
+		NcAppContent,
 	},
 	props: {
 		title: {
@@ -67,6 +70,10 @@ export default {
 			default: '',
 		},
 		url: {
+			type: String,
+			default: '',
+		},
+		folderId: {
 			type: String,
 			default: '',
 		},
@@ -83,7 +90,7 @@ export default {
 			exists: false,
 			loading: true,
 			showPicker: false,
-			folder: -1,
+			folder: parseInt(this.folderId || -1),
 		}
 	},
 	computed: {
@@ -177,7 +184,13 @@ figure[class^=icon-] {
 
 .bookmarklet label {
 	margin-top: 10px;
-	display: block;
+	display: flex;
+	align-items: center;
+	align-content: space-evenly;
+}
+
+.bookmarklet label :last-child {
+	margin-left: 10px;
 }
 
 .bookmarklet input {

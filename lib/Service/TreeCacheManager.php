@@ -1,6 +1,7 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -8,50 +9,37 @@
 namespace OCA\Bookmarks\Service;
 
 use OCA\Bookmarks\Db\BookmarkMapper;
+use OCA\Bookmarks\Db\Folder;
 use OCA\Bookmarks\Db\FolderMapper;
 use OCA\Bookmarks\Db\SharedFolderMapper;
 use OCA\Bookmarks\Db\ShareMapper;
+use OCA\Bookmarks\Db\TagMapper;
 use OCA\Bookmarks\Db\TreeMapper;
-use OCA\Bookmarks\Db\Folder;
 use OCA\Bookmarks\Events\ChangeEvent;
 use OCA\Bookmarks\Events\MoveEvent;
 use OCA\Bookmarks\Exception\UnsupportedOperation;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
-use OCP\AppFramework\IAppContainer;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use OCP\ICache;
 use OCP\ICacheFactory;
+use Psr\Container\ContainerInterface;
 use UnexpectedValueException;
 
+/**
+ * @psalm-implements IEventListener<ChangeEvent>
+ */
 class TreeCacheManager implements IEventListener {
+	public const TTL = 60 * 60 * 24 * 30; // one month
 	public const CATEGORY_HASH = 'hashes';
 	public const CATEGORY_SUBFOLDERS = 'subFolders';
+	public const CATEGORY_DELETED_SUBFOLDERS = 'deletedSubFolders';
 	public const CATEGORY_FOLDERCOUNT = 'folderCount';
 	public const CATEGORY_CHILDREN = 'children';
+	public const CATEGORY_CHILDREN_LAYER = 'children_layer';
 	public const CATEGORY_CHILDORDER = 'childOrder';
 
-	/**
-	 * @var BookmarkMapper
-	 */
-	protected $bookmarkMapper;
-	/**
-	 * @var ShareMapper
-	 */
-	protected $shareMapper;
-	/**
-	 * @var SharedFolderMapper
-	 */
-	protected $sharedFolderMapper;
-	/**
-	 * @var TreeMapper
-	 */
-	protected $treeMapper;
-	/**
-	 * @var FolderMapper
-	 */
-	protected $folderMapper;
 	/**
 	 * @var bool
 	 */
@@ -61,14 +49,6 @@ class TreeCacheManager implements IEventListener {
 	 * @var ICache[]
 	 */
 	private $caches = [];
-	/**
-	 * @var IAppContainer
-	 */
-	private $appContainer;
-	/**
-	 * @var \OCA\Bookmarks\Db\TagMapper
-	 */
-	private $tagMapper;
 
 	/**
 	 * FolderMapper constructor.
@@ -78,21 +58,25 @@ class TreeCacheManager implements IEventListener {
 	 * @param ShareMapper $shareMapper
 	 * @param SharedFolderMapper $sharedFolderMapper
 	 * @param ICacheFactory $cacheFactory
-	 * @param IAppContainer $appContainer
-	 * @param \OCA\Bookmarks\Db\TagMapper $tagMapper
+	 * @param ContainerInterface $appContainer
+	 * @param TagMapper $tagMapper
 	 */
-	public function __construct(FolderMapper $folderMapper, BookmarkMapper $bookmarkMapper, ShareMapper $shareMapper, SharedFolderMapper $sharedFolderMapper, ICacheFactory $cacheFactory, IAppContainer $appContainer, \OCA\Bookmarks\Db\TagMapper $tagMapper) {
-		$this->folderMapper = $folderMapper;
-		$this->bookmarkMapper = $bookmarkMapper;
-		$this->shareMapper = $shareMapper;
-		$this->sharedFolderMapper = $sharedFolderMapper;
-		$this->caches[self::CATEGORY_HASH] = $cacheFactory->createLocal('bookmarks:'.self::CATEGORY_HASH);
-		$this->caches[self::CATEGORY_SUBFOLDERS] = $cacheFactory->createLocal('bookmarks:'.self::CATEGORY_SUBFOLDERS);
-		$this->caches[self::CATEGORY_FOLDERCOUNT] = $cacheFactory->createLocal('bookmarks:'.self::CATEGORY_FOLDERCOUNT);
-		$this->caches[self::CATEGORY_CHILDREN] = $cacheFactory->createLocal('bookmarks:'.self::CATEGORY_CHILDREN);
-		$this->caches[self::CATEGORY_CHILDORDER] = $cacheFactory->createLocal('bookmarks:'.self::CATEGORY_CHILDORDER);
-		$this->appContainer = $appContainer;
-		$this->tagMapper = $tagMapper;
+	public function __construct(
+		protected FolderMapper $folderMapper,
+		protected BookmarkMapper $bookmarkMapper,
+		protected ShareMapper $shareMapper,
+		protected SharedFolderMapper $sharedFolderMapper,
+		protected ICacheFactory $cacheFactory,
+		protected ContainerInterface $appContainer,
+		protected TagMapper $tagMapper,
+	) {
+		$this->caches[self::CATEGORY_HASH] = $cacheFactory->createDistributed('bookmarks:' . self::CATEGORY_HASH);
+		$this->caches[self::CATEGORY_SUBFOLDERS] = $cacheFactory->createDistributed('bookmarks:' . self::CATEGORY_SUBFOLDERS);
+		$this->caches[self::CATEGORY_DELETED_SUBFOLDERS] = $cacheFactory->createDistributed('bookmarks:' . self::CATEGORY_DELETED_SUBFOLDERS);
+		$this->caches[self::CATEGORY_FOLDERCOUNT] = $cacheFactory->createDistributed('bookmarks:' . self::CATEGORY_FOLDERCOUNT);
+		$this->caches[self::CATEGORY_CHILDREN] = $cacheFactory->createDistributed('bookmarks:' . self::CATEGORY_CHILDREN);
+		$this->caches[self::CATEGORY_CHILDREN_LAYER] = $cacheFactory->createDistributed('bookmarks:' . self::CATEGORY_CHILDREN_LAYER);
+		$this->caches[self::CATEGORY_CHILDORDER] = $cacheFactory->createDistributed('bookmarks:' . self::CATEGORY_CHILDORDER);
 	}
 
 
@@ -106,7 +90,7 @@ class TreeCacheManager implements IEventListener {
 	 * @return string
 	 */
 	private function getCacheKey(string $type, int $folderId) : string {
-		return $type . ':'. $folderId;
+		return $type . ':' . $folderId;
 	}
 
 	/**
@@ -129,16 +113,19 @@ class TreeCacheManager implements IEventListener {
 	 */
 	public function set(string $category, string $type, int $id, $data) {
 		$key = $this->getCacheKey($type, $id);
-		return $this->caches[$category]->set($key, $data, 60 * 60 * 24);
+		return $this->caches[$category]->set($key, $data, self::TTL);
 	}
 
 	/**
 	 * @param string $type
 	 * @param int $id
 	 */
-	public function remove(string $type, int $id): void {
+	public function remove(string $type, int $id, array $previousFolders = []): void {
 		$key = $this->getCacheKey($type, $id);
-		foreach ($this->caches as $cache) {
+		foreach ($this->caches as $cacheType => $cache) {
+			if ($cacheType === self::CATEGORY_CHILDREN_LAYER && count($previousFolders) > 1) {
+				continue;
+			}
 			$cache->remove($key);
 		}
 	}
@@ -152,14 +139,14 @@ class TreeCacheManager implements IEventListener {
 			// In case we have run into a folder loop
 			return;
 		}
-		$this->remove(TreeMapper::TYPE_FOLDER, $folderId);
+		$this->remove(TreeMapper::TYPE_FOLDER, $folderId, $previousFolders);
 		$previousFolders[] = $folderId;
 
 		// Invalidate parent
 		try {
 			$parentFolder = $this->getTreeMapper()->findParentOf(TreeMapper::TYPE_FOLDER, $folderId);
 			$this->invalidateFolder($parentFolder->getId(), $previousFolders);
-		} catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+		} catch (DoesNotExistException|MultipleObjectsReturnedException $e) {
 			return;
 		}
 
@@ -169,7 +156,7 @@ class TreeCacheManager implements IEventListener {
 			try {
 				$parentFolder = $this->getTreeMapper()->findParentOf(TreeMapper::TYPE_SHARE, $sharedFolder->getId());
 				$this->invalidateFolder($parentFolder->getId(), $previousFolders);
-			} catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+			} catch (DoesNotExistException|MultipleObjectsReturnedException $e) {
 				continue;
 			}
 		}
@@ -179,7 +166,7 @@ class TreeCacheManager implements IEventListener {
 		$this->remove(TreeMapper::TYPE_BOOKMARK, $bookmarkId);
 
 		// Invalidate parent
-		$parentFolders = $this->getTreeMapper()->findParentsOf(TreeMapper::TYPE_BOOKMARK, $bookmarkId);
+		$parentFolders = $this->getTreeMapper()->findParentsOf(TreeMapper::TYPE_BOOKMARK, $bookmarkId, true);
 		foreach ($parentFolders as $parentFolder) {
 			$this->invalidateFolder($parentFolder->getId());
 		}
@@ -259,7 +246,7 @@ class TreeCacheManager implements IEventListener {
 			try {
 				$bookmark[$field] = $entity->{'get' . $field}();
 			} catch (\BadFunctionCallException $e) {
-				throw new UnsupportedOperation('Field '.$field.' does not exist');
+				throw new UnsupportedOperation('Field ' . $field . ' does not exist');
 			}
 		}
 		$hash[$selector] = hash('sha256', json_encode($bookmark, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
@@ -299,5 +286,11 @@ class TreeCacheManager implements IEventListener {
 
 	public function setInvalidationEnabled(bool $enabled): void {
 		$this->enabled = $enabled;
+	}
+
+	public function invalidateAll() {
+		foreach ($this->caches as $cache) {
+			$cache->clear();
+		}
 	}
 }

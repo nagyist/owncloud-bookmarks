@@ -79,8 +79,8 @@ class BookmarkMapperTest extends TestCase {
 		$bookmark = $this->bookmarkMapper->insert($bookmark);
 		$foundEntity = $this->bookmarkMapper->find($bookmark->getId());
 		$this->assertSame($bookmark->getUrl(), $foundEntity->getUrl());
-		$this->assertSame((string) $bookmark->getTitle(), (string) $foundEntity->getTitle());
-		$this->assertSame((string) $bookmark->getDescription(), (string) $foundEntity->getDescription());
+		$this->assertSame((string)$bookmark->getTitle(), (string)$foundEntity->getTitle());
+		$this->assertSame((string)$bookmark->getDescription(), (string)$foundEntity->getDescription());
 	}
 
 	/**
@@ -102,7 +102,7 @@ class BookmarkMapperTest extends TestCase {
 		$entity->setTitle('foobar');
 		$this->bookmarkMapper->update($entity);
 		$foundEntity = $this->bookmarkMapper->find($entity->getId());
-		$this->assertSame((string) $entity->getTitle(), (string) $foundEntity->getTitle());
+		$this->assertSame((string)$entity->getTitle(), (string)$foundEntity->getTitle());
 	}
 
 	/**
@@ -130,13 +130,13 @@ class BookmarkMapperTest extends TestCase {
 	 * @return array
 	 */
 	public function singleBookmarksProvider(): array {
-		return array_map(static function ($props) {
+		return array_map(function ($props) {
 			return [Db\Bookmark::fromArray($props)];
 		}, [
 			'Simple URL with title and description' => ['url' => 'https://google.com/', 'title' => 'Google', 'description' => 'Search engine'],
-			'Simple URL with title' => ['url' => 'https://nextcloud.com/', 'title' => 'Nextcloud'],
-			'Simple URL' => ['url' => 'https://php.net/'],
-			'URL with unicode' => ['url' => 'https://de.wikipedia.org/wiki/%C3%9C'],
+			'Simple URL with title' => ['url' => 'https://nextcloud.com/', 'title' => 'Nextcloud', 'description' => ''],
+			'Simple URL' => ['url' => 'https://php.net/', 'title' => '', 'description' => ''],
+			'URL with unicode' => ['url' => 'https://de.wikipedia.org/wiki/%C3%9C', 'title' => '', 'description' => ''],
 		]);
 	}
 }

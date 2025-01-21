@@ -1,18 +1,19 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
 
 namespace OCA\Bookmarks\BackgroundJobs;
 
-use OCP\AppFramework\Utility\ITimeFactory;
-use OCP\BackgroundJob\TimedJob;
 use OCA\Bookmarks\Db\Bookmark;
 use OCA\Bookmarks\Db\BookmarkMapper;
 use OCA\Bookmarks\Service\BookmarkPreviewer;
 use OCA\Bookmarks\Service\CrawlService;
+use OCP\AppFramework\Utility\ITimeFactory;
+use OCP\BackgroundJob\TimedJob;
 use OCP\IConfig;
 
 class CrawlJob extends TimedJob {
@@ -33,7 +34,7 @@ class CrawlJob extends TimedJob {
 	private $crawler;
 
 	public function __construct(
-		IConfig $settings, BookmarkMapper $bookmarkMapper, CrawlService $crawler, ITimeFactory $timeFactory
+		IConfig $settings, BookmarkMapper $bookmarkMapper, CrawlService $crawler, ITimeFactory $timeFactory,
 	) {
 		parent::__construct($timeFactory);
 		$this->settings = $settings;

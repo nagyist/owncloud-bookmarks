@@ -1,5 +1,5 @@
 <!--
-  - Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+  - Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
   -
   - This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
   -->
@@ -15,7 +15,8 @@
 		:draggable="draggable && !renaming"
 		@dragstart="onDragStart">
 		<template v-if="!renaming">
-			<a :href="url"
+			<component :is="url? 'a' : 'span'"
+				:href="url"
 				class="item__clickLink"
 				tabindex="0"
 				target="_blank"
@@ -26,12 +27,17 @@
 						:aria-label="selectLabel"
 						@click="$event.preventDefault(); $event.stopImmediatePropagation(); $emit('select');" />
 				</div>
-				<slot name="icon" />
+				<div class="item__icon">
+					<slot name="icon" />
+				</div>
 				<div class="item__labels">
 					<slot name="title" />
 					<slot name="tags">
 						<TagLine :tags="tags" />
 					</slot>
+				</div>
+				<div class="item__rating">
+					<slot name="rating" />
 				</div>
 				<div v-if="editable && !selected"
 					ref="actions"
@@ -41,7 +47,7 @@
 						<slot name="actions" />
 					</NcActions>
 				</div>
-			</a>
+			</component>
 		</template>
 		<div v-else class="item__rename">
 			<slot name="icon" />
@@ -53,7 +59,7 @@
 			<NcActions>
 				<NcActionButton @click="onRenameSubmit">
 					<template #icon>
-						<CheckIcon />
+						<CheckIcon :size="20" />
 					</template>
 					{{ t('bookmarks', 'Submit') }}
 				</NcActionButton>
@@ -61,7 +67,7 @@
 			<NcActions>
 				<NcActionButton @click="$emit('rename-cancel')">
 					<template #icon>
-						<CloseIcon />
+						<CloseIcon :size="20" />
 					</template>
 					{{ t('bookmarks', 'Cancel') }}
 				</NcActionButton>
@@ -75,8 +81,7 @@ import { NcActions, NcActionButton } from '@nextcloud/vue'
 import TagLine from './TagLine.vue'
 import DragImage from './DragImage.vue'
 import { mutations } from '../store/index.js'
-import CheckIcon from 'vue-material-design-icons/Check.vue'
-import CloseIcon from 'vue-material-design-icons/Close.vue'
+import { CheckIcon, CloseIcon } from './Icons.js'
 
 export default {
 	name: 'Item',
@@ -250,6 +255,31 @@ export default {
 	padding: 0 8px 0 0;
 }
 
+.item__icon {
+	position: relative;
+}
+
+.item--gridview .item__rating {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	background: var(--color-main-background);
+	border-radius: var(--border-radius-large);
+}
+
+.item__rating .material-design-icon {
+	display: inline-block;
+}
+
+.item--gridview .item__rating .material-design-icon {
+	display: flex;
+}
+
+.item--gridview .item__icon {
+	top: -155px;
+	left: 110px;
+}
+
 .item--gridview  .item__rename {
 	padding: 0 8px 5px 10px;
 }
@@ -266,7 +296,7 @@ export default {
 }
 
 .item.dropTarget--available {
-	background: var(--color-primary-light);
+	background: var(--color-primary-element-light);
 }
 
 .item.dropTarget--active {
@@ -315,6 +345,7 @@ export default {
 
 .item__NcActions {
 	flex: 0;
+	margin: 3px;
 }
 
 .item--gridview .tagline {

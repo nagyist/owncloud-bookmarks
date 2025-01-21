@@ -1,4 +1,5 @@
 <?php
+
 /*
  * Copyright (c) 2022. The Nextcloud Bookmarks contributors.
  *
@@ -13,6 +14,9 @@ use OCP\EventDispatcher\IEventListener;
 use OCP\IRequest;
 use OCP\Util;
 
+/**
+ * @psalm-implements IEventListener<BeforeTemplateRenderedEvent>
+ */
 class BeforeTemplateRenderedListener implements IEventListener {
 	private $request;
 	public function __construct(IRequest $request) {

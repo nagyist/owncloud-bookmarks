@@ -1,6 +1,7 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -25,9 +26,11 @@ use OCA\Bookmarks\QueryParameters;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
 use OCP\BackgroundJob\IJobList;
+use OCP\DB\Exception;
 use OCP\EventDispatcher\IEventDispatcher;
 
 class BookmarkService {
+	public const PROTOCOLS_REGEX = '/^(https?|s?ftp|file|javascript):/i';
 	/**
 	 * @var BookmarkMapper
 	 */
@@ -129,12 +132,13 @@ class BookmarkService {
 	 * @throws UnsupportedOperation
 	 * @throws UrlParseError
 	 * @throws UserLimitExceededError
+	 * @throws Exception
 	 */
-	public function create(string $userId, string $url = '', string $title = null, string $description = null, array $tags = null, $folders = []): Bookmark {
+	public function create(string $userId, string $url = '', ?string $title = null, ?string $description = null, ?array $tags = null, $folders = []): Bookmark {
 		$bookmark = null;
 		$ownFolders = array_filter($folders, function ($folderId) use ($userId) {
 			/**
-			 * @var $folder Folder
+			 * @var Folder $folder
 			 */
 			$folder = $this->folderMapper->find($folderId);
 			return $folder->getUserId() === $userId;
@@ -142,7 +146,7 @@ class BookmarkService {
 		$foreignFolders = array_diff($folders, $ownFolders);
 		foreach ($foreignFolders as $folderId) {
 			/**
-			 * @var $folder Folder
+			 * @var Folder $folder
 			 */
 			$folder = $this->folderMapper->find($folderId);
 			$bookmark = $this->_addBookmark($folder->getUserId(), $url, $title, $description, $tags, [$folder->getId()]);
@@ -161,32 +165,35 @@ class BookmarkService {
 	}
 
 	/**
-	 * @param $title
-	 * @param $url
-	 * @param $description
 	 * @param $userId
-	 * @param $tags
-	 * @param $folders
+	 * @param $url
+	 * @param string|null $title
+	 * @param string|null $description
+	 * @param array|null $tags
+	 * @param array $folders
 	 * @return Bookmark
 	 * @throws AlreadyExistsError
+	 * @throws Exception
+	 * @throws MultipleObjectsReturnedException
+	 * @throws UnsupportedOperation
 	 * @throws UrlParseError
 	 * @throws UserLimitExceededError
-	 * @throws UnsupportedOperation
+	 * @throws DoesNotExistException
 	 */
-	private function _addBookmark($userId, $url, string $title = null, $description = null, array $tags = null, array $folders = []): Bookmark {
+	private function _addBookmark($userId, $url, ?string $title = null, ?string $description = null, ?array $tags = null, array $folders = []): Bookmark {
 		$bookmark = null;
+
 		try {
 			$bookmark = $this->bookmarkMapper->findByUrl($userId, $url);
 		} catch (DoesNotExistException $e) {
-			$protocols = '/^(https?|s?ftp):\/\//i';
-			if (!preg_match($protocols, $url)) {
+			if (!preg_match(self::PROTOCOLS_REGEX, $url)) {
 				// if no allowed protocol is given, evaluate https and https
 				foreach (['https://', 'http://'] as $protocol) {
-					$testUrl = $this->urlNormalizer->normalize($protocol . $url);
 					try {
+						$testUrl = $this->urlNormalizer->normalize($protocol . $url);
 						$bookmark = $this->bookmarkMapper->findByUrl($userId, $testUrl);
 						break;
-					} catch (DoesNotExistException $e) {
+					} catch (UrlParseError|DoesNotExistException $e) {
 						continue;
 					}
 				}
@@ -199,19 +206,24 @@ class BookmarkService {
 			if (!isset($title, $description)) {
 				// Inspect web page (do some light scraping)
 				// allow only http(s) and (s)ftp
-				$protocols = '/^(https?|s?ftp)\:\/\//i';
-				if (preg_match($protocols, $url)) {
-					$data = $this->linkExplorer->get($url);
+				if (preg_match('/^https?:\/\//i', $url)) {
+					$testUrl = $this->urlNormalizer->normalize($url);
+					$data = $this->linkExplorer->get($testUrl);
 				} else {
 					// if no allowed protocol is given, evaluate https and https
-					foreach (['https://', 'http://'] as $protocol) {
+					foreach (['https://', 'http://', ''] as $protocol) {
 						$testUrl = $protocol . $url;
 						$data = $this->linkExplorer->get($testUrl);
 						if (isset($data['basic']['title'])) {
+							$url = $protocol . $url;
 							break;
 						}
 					}
 				}
+			}
+
+			if (!preg_match(self::PROTOCOLS_REGEX, $url)) {
+				throw new UrlParseError();
 			}
 
 			$url = $data['url'] ?? $url;
@@ -237,6 +249,9 @@ class BookmarkService {
 		}
 
 		$this->treeMapper->addToFolders(TreeMapper::TYPE_BOOKMARK, $bookmark->getId(), $folders);
+		foreach ($folders as $folderId) {
+			$this->treeMapper->softUndeleteEntry(TreeMapper::TYPE_BOOKMARK, $bookmark->getId(), $folderId);
+		}
 		$this->eventDispatcher->dispatch(CreateEvent::class,
 			new CreateEvent(TreeMapper::TYPE_BOOKMARK, $bookmark->getId())
 		);
@@ -261,10 +276,11 @@ class BookmarkService {
 	 * @throws UnsupportedOperation
 	 * @throws UrlParseError
 	 * @throws UserLimitExceededError
+	 * @throws Exception
 	 */
-	public function update(string $userId, $id, string $url = null, string $title = null, string $description = null, array $tags = null, array $folders = null): ?Bookmark {
+	public function update(string $userId, int $id, ?string $url = null, ?string $title = null, ?string $description = null, ?array $tags = null, ?array $folders = null): ?Bookmark {
 		/**
-		 * @var $bookmark Bookmark
+		 * @var Bookmark $bookmark
 		 */
 		$bookmark = $this->bookmarkMapper->find($id);
 
@@ -279,6 +295,19 @@ class BookmarkService {
 		}
 
 		if ($url !== null) {
+			try {
+				$oldBookmark = $this->bookmarkMapper->findByUrl($userId, $url);
+				if (count($this->treeMapper->findParentsOf(TreeMapper::TYPE_BOOKMARK, $oldBookmark->getId(), false)) === 0) {
+					$this->treeMapper->deleteEntry(TreeMapper::TYPE_BOOKMARK, $oldBookmark->getId());
+				} elseif ($oldBookmark->getId() !== $bookmark->getId()) {
+					throw new AlreadyExistsError('Bookmark already exists');
+				}
+			} catch (DoesNotExistException $e) {
+				// pass
+			}
+			if (!preg_match(self::PROTOCOLS_REGEX, $url)) {
+				throw new UrlParseError();
+			}
 			if ($url !== $bookmark->getUrl()) {
 				$bookmark->setAvailable(true);
 			}
@@ -319,9 +348,11 @@ class BookmarkService {
 			}
 
 			/**
-			 * @var $currentOwnFolders Folder[]
+			 * @var Folder[] $currentOwnFolders
 			 */
 			$currentOwnFolders = $this->treeMapper->findParentsOf(TreeMapper::TYPE_BOOKMARK, $bookmark->getId());
+			// Updating user may not be the owner of the bookmark
+			// We have to keep the bookmark in folders that are inaccessible to the current user
 			if ($bookmark->getUserId() !== $userId) {
 				$currentInaccessibleOwnFolders = array_map(static function ($f) {
 					return $f->getId();
@@ -338,6 +369,10 @@ class BookmarkService {
 			if (count($ownFolders) === 0) {
 				$this->bookmarkMapper->delete($bookmark);
 				return null;
+			} else {
+				foreach ($ownFolders as $folderId) {
+					$this->treeMapper->softUndeleteEntry(TreeMapper::TYPE_BOOKMARK, $bookmark->getId(), $folderId);
+				}
 			}
 		}
 
@@ -363,9 +398,14 @@ class BookmarkService {
 	 * @throws DoesNotExistException
 	 * @throws MultipleObjectsReturnedException
 	 * @throws UnsupportedOperation
+	 * @throws Exception
 	 */
-	public function removeFromFolder(int $folderId, int $bookmarkId): void {
-		$this->treeMapper->removeFromFolders(TreeMapper::TYPE_BOOKMARK, $bookmarkId, [$folderId]);
+	public function removeFromFolder(int $folderId, int $bookmarkId, bool $hardDelete = false): void {
+		if ($hardDelete) {
+			$this->treeMapper->removeFromFolders(TreeMapper::TYPE_BOOKMARK, $bookmarkId, [$folderId]);
+		} else {
+			$this->treeMapper->softDeleteEntry(TreeMapper::TYPE_BOOKMARK, $bookmarkId, $folderId);
+		}
 	}
 
 	/**
@@ -378,15 +418,10 @@ class BookmarkService {
 	 * @throws UnsupportedOperation
 	 * @throws UrlParseError
 	 * @throws UserLimitExceededError
+	 * @throws Exception
 	 */
 	public function addToFolder(int $folderId, int $bookmarkId): void {
-		/**
-		 * @var $folder Folder
-		 */
 		$folder = $this->folderMapper->find($folderId);
-		/**
-		 * @var $bookmark Bookmark
-		 */
 		$bookmark = $this->bookmarkMapper->find($bookmarkId);
 		if ($folder->getUserId() === $bookmark->getUserId()) {
 			$this->treeMapper->addToFolders(TreeMapper::TYPE_BOOKMARK, $bookmarkId, [$folderId]);
@@ -397,6 +432,17 @@ class BookmarkService {
 	}
 
 	/**
+	 * @param int $folderId
+	 * @param int $bookmarkId
+	 * @throws DoesNotExistException|MultipleObjectsReturnedException|UnsupportedOperation|Exception
+	 */
+	public function undeleteInFolder(int $folderId, int $bookmarkId): void {
+		$this->folderMapper->find($folderId);
+		$this->bookmarkMapper->find($bookmarkId);
+		$this->treeMapper->softUndeleteEntry(TreeMapper::TYPE_BOOKMARK, $bookmarkId, $folderId);
+	}
+
+	/**
 	 * @param int $id
 	 * @throws DoesNotExistException
 	 * @throws MultipleObjectsReturnedException
@@ -404,7 +450,7 @@ class BookmarkService {
 	 */
 	public function delete(int $id): void {
 		$bookmark = $this->bookmarkMapper->find($id);
-		$parents = $this->treeMapper->findParentsOf(TreeMapper::TYPE_BOOKMARK, $id);
+		$parents = $this->treeMapper->findParentsOf(TreeMapper::TYPE_BOOKMARK, $id, true);
 		foreach ($parents as $parent) {
 			$this->treeMapper->deleteEntry(TreeMapper::TYPE_BOOKMARK, $bookmark->getId(), $parent->getId());
 		}
@@ -414,17 +460,29 @@ class BookmarkService {
 	}
 
 	/**
-	 * @param $userId
-	 * @param string $url
+	 * @param int $id
+	 * @return Bookmark|null
+	 */
+	public function findById(int $id) : ?Bookmark {
+		try {
+			return $this->bookmarkMapper->find($id);
+		} catch (DoesNotExistException|MultipleObjectsReturnedException $e) {
+			return null;
+		}
+	}
+
+	/**
 	 * @param string $userId
 	 *
+	 * @param string $url
 	 * @return Bookmark
 	 *
-	 * @throws DoesNotExistException|UrlParseError
+	 * @throws DoesNotExistException
+	 * @throws Exception
+	 * @throws UrlParseError
 	 */
 	public function findByUrl(string $userId, string $url = ''): Bookmark {
 		$params = new QueryParameters();
-		/** @var Bookmark[] $bookmarks */
 		$bookmarks = $this->bookmarkMapper->findAll($userId, $params->setUrl($url));
 		if (isset($bookmarks[0])) {
 			return $bookmarks[0];
@@ -440,7 +498,6 @@ class BookmarkService {
 	 * @throws UrlParseError
 	 */
 	public function click(int $id): void {
-		/** @var Bookmark $bookmark */
 		$bookmark = $this->bookmarkMapper->find($id);
 		$bookmark->incrementClickcount();
 		$this->bookmarkMapper->update($bookmark);
@@ -453,11 +510,8 @@ class BookmarkService {
 	 * @throws MultipleObjectsReturnedException
 	 */
 	public function getImage(int $id): ?IImage {
-		/**
-		 * @var $bookmark Bookmark
-		 */
 		$bookmark = $this->bookmarkMapper->find($id);
-		return $this->bookmarkPreviewer->getImage($bookmark);
+		return $this->bookmarkPreviewer->getImage($bookmark, true);
 	}
 
 	/**
@@ -467,11 +521,8 @@ class BookmarkService {
 	 * @throws MultipleObjectsReturnedException
 	 */
 	public function getFavicon(int $id): ?IImage {
-		/**
-		 * @var $bookmark Bookmark
-		 */
 		$bookmark = $this->bookmarkMapper->find($id);
-		return $this->faviconPreviewer->getImage($bookmark);
+		return $this->faviconPreviewer->getImage($bookmark, true);
 	}
 
 	/**

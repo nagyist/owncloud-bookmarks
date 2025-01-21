@@ -3,10 +3,10 @@ OC.L10N.register(
     {
     "Rename" : "Rename",
     "Move" : "Move",
-    "Delete" : "حذف کریں",
     "Search" : "Search",
     "Cancel" : "منسوخ کریں",
     "Shared with you" : "Shared with you",
+    "Delete" : "حذف کریں",
     "Title" : "عنوان",
     "Link" : "Link",
     "Notes" : "Notes",

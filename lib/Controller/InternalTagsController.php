@@ -1,6 +1,7 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -24,7 +25,7 @@ class InternalTagsController extends ApiController {
 	 *
 	 * @NoAdminRequired
 	 */
-	public function deleteTag($old_name = ""): JSONResponse {
+	public function deleteTag($old_name = ''): JSONResponse {
 		return $this->publicController->deleteTag($old_name);
 	}
 
@@ -36,7 +37,7 @@ class InternalTagsController extends ApiController {
 	 *
 	 * @NoAdminRequired
 	 */
-	public function renameTag($old_name = "", $new_name = "", $name = ''): JSONResponse {
+	public function renameTag($old_name = '', $new_name = '', $name = ''): JSONResponse {
 		return $this->publicController->renameTag($old_name, $new_name, $name);
 	}
 

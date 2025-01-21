@@ -1,5 +1,5 @@
 <!--
-  - Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+  - Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
   -
   - This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
   -->
@@ -7,28 +7,40 @@
 <template>
 	<div :class="['controls', $store.state.public && 'wide']">
 		<div class="controls__left">
-			<NcActions v-if="$route.name === routes.FOLDER">
+			<TrashbinIcon v-if="isTrashbin" :size="20" />
+			<h2 v-if="isTrashbin">
+				{{ t('bookmarks', 'Trash Bin') }}
+			</h2>
+			<NcActions v-if="$route.name === routes.FOLDER || ($route.name === routes.SEARCH && Number($route.params.folder) !== -1)">
 				<NcActionButton @click="onClickBack">
 					<template #icon>
-						<ArrowLeftIcon />
+						<ArrowLeftIcon :size="20" />
 					</template>
 					{{ t('bookmarks', 'Go back') }}
 				</NcActionButton>
 			</NcActions>
-			<template v-if="$route.name === routes.FOLDER">
-				<h2><FolderIcon /> <span>{{ folder.title }}</span></h2>
-				<NcActions v-if="permissions.canShare">
+			<template v-if="$route.name === routes.FOLDER || ($route.name === routes.SEARCH && Number($route.params.folder) !== -1)">
+				<h2><FolderIcon :size="20" /> <span :class="{strikethrough: isTrashbin}">{{ folder.title }}</span></h2>
+				<NcActions v-if="permissions.canShare && !isTrashbin">
 					<NcActionButton :close-after-click="true" @click="onOpenFolderShare">
 						<template #icon>
-							<ShareVariantIcon />
+							<ShareVariantIcon :size="20" />
 						</template>
 						{{ t('bookmarks', 'Share folder') }}
 					</NcActionButton>
 				</NcActions>
+				<NcActions v-if="!isTrashbin">
+					<NcActionButton :close-after-click="true" @click="onOpenFolderDetails">
+						<template #icon>
+							<InformationVariantIcon :size="20" />
+						</template>
+						{{ t('bookmarks', 'Open folder details') }}
+					</NcActionButton>
+				</NcActions>
 			</template>
 			<template v-if="$route.name === routes.TAGS">
-				<TagIcon />
-				<NcMultiselect class="controls__tags"
+				<TagIcon :size="20" />
+				<NcSelect class="controls__tags"
 					:value="tags"
 					:auto-limit="false"
 					:limit="7"
@@ -37,16 +49,16 @@
 					:placeholder="t('bookmarks', 'Select one or more tags')"
 					@input="onTagsChange" />
 			</template>
-			<NcActions v-if="!isPublic"
+			<NcActions v-if="!isPublic && !isTrashbin"
 				v-tooltip="t('bookmarks', 'New')"
-				:title="t('bookmarks', 'New')">
+				:name="t('bookmarks', 'New')">
 				<template #icon>
-					<PlusIcon />
+					<PlusIcon :size="20" />
 				</template>
 				<NcActionButton :close-after-click="true"
 					@click="onAddBookmark">
 					<template #icon>
-						<EarthIcon />
+						<EarthIcon :size="20" />
 					</template>
 					{{
 						t('bookmarks', 'New bookmark')
@@ -55,7 +67,7 @@
 				<NcActionButton :close-after-click="true"
 					@click="onAddFolder">
 					<template #icon>
-						<FolderIcon />
+						<FolderIcon :size="20" />
 					</template>
 					{{ t('bookmarks', 'New folder') }}
 				</NcActionButton>
@@ -63,18 +75,19 @@
 			<BulkEditing v-if="hasSelection" />
 		</div>
 		<div class="controls__right">
-			<NcActions>
-				<NcActionButton @click="onToggleViewMode">
-					<template #icon>
-						<ViewListIcon v-if="viewMode !== 'list'" />
-						<ViewGridIcon v-else />
-					</template>
-					{{ viewMode === 'list' ? t('bookmarks', 'Change to grid view') : t('bookmarks', 'Change to list view') }}
-				</NcActionButton>
-			</NcActions>
+			<div>
+				<NcActions>
+					<NcActionButton :name="viewMode === 'list' ? t('bookmarks', 'Change to grid view') : t('bookmarks', 'Change to list view')" @click="onToggleViewMode">
+						<template #icon>
+							<ViewListIcon v-if="viewMode !== 'list'" :size="20" />
+							<ViewGridIcon v-else :size="20" />
+						</template>
+					</NcActionButton>
+				</NcActions>
+			</div>
 			<NcActions v-tooltip="sortingOptions[sorting].description">
 				<template #icon>
-					<component :is="sortingOptions[sorting].icon" :size="20" :fill-color="colorMainText" />
+					<component :is="sortingOptions[sorting].icon" :fill-color="colorMainText" />
 				</template>
 				<NcActionButton v-for="(option, key) in sortingOptions"
 					:key="key"
@@ -82,63 +95,59 @@
 					@click="onChangeSorting(key)">
 					<template #icon>
 						<component :is="option.icon"
+							:size="20"
 							:fill-color="key === sorting? colorPrimaryElement : colorMainText" />
 					</template>
 					{{ option.description }}
 				</NcActionButton>
 			</NcActions>
-			<NcActions force-menu>
+			<NcActions v-if="!isTrashbin" force-menu>
 				<template #icon>
-					<RssIcon />
+					<RssIcon :size="20" />
 				</template>
-				<NcActionButton :title="t('bookmarks', 'Copy RSS Feed of current view')"
+				<NcActionButton :name="t('bookmarks', 'Copy RSS Feed of current view')"
 					:close-after-click="true"
 					@click="copyRssUrl">
 					<template #icon>
-						<RssIcon />
+						<RssIcon :size="20" />
 					</template>
 					{{ !$store.state.public? t('bookmarks', 'The RSS feed requires authentication with your Nextcloud credentials') : '' }}
 				</NcActionButton>
 			</NcActions>
-			<NcTextField v-if="isPublic"
+			<NcTextField v-if="!isTrashbin"
 				:value.sync="search"
 				:label="t('bookmarks','Search')"
 				:placeholder="t('bookmarks','Search')"
 				class="inline-search"
 				@update:value="onSearch($event)">
-				<MagnifyIcon />
+				<MagnifyIcon :size="20" />
 			</NcTextField>
+			<template v-if="isTrashbinRoot">
+				<NcButton @click="onEmptyTrashbin">
+					<template #icon>
+						<DeleteForeverIcon :size="20" />
+					</template>
+					{{ t('bookmarks', 'Empty trash bin') }}
+				</NcButton>
+			</template>
 		</div>
 	</div>
 </template>
 <script>
-import { NcMultiselect, NcActions, NcActionButton, NcActionInput, NcActionRouter, NcTextField } from '@nextcloud/vue'
-import MagnifyIcon from 'vue-material-design-icons/Magnify.vue'
-import EarthIcon from 'vue-material-design-icons/Earth.vue'
-import ViewGridIcon from 'vue-material-design-icons/ViewGrid.vue'
-import ViewListIcon from 'vue-material-design-icons/ViewList.vue'
-import PlusIcon from 'vue-material-design-icons/Plus.vue'
-import FolderIcon from 'vue-material-design-icons/Folder.vue'
-import ArrowLeftIcon from 'vue-material-design-icons/ArrowLeft.vue'
-import RssIcon from 'vue-material-design-icons/Rss.vue'
-import SortAlphabeticalAscendingIcon from 'vue-material-design-icons/SortAlphabeticalAscending.vue'
-import SortBoolAscendingIcon from 'vue-material-design-icons/SortBoolAscending.vue'
-import SortClockAscendingOutlineIcon from 'vue-material-design-icons/SortClockAscendingOutline.vue'
-import SortCalendarAscendingIcon from 'vue-material-design-icons/SortCalendarAscending.vue'
-import SortNumericAscendingIcon from 'vue-material-design-icons/SortNumericAscending.vue'
-import SortAscendingIcon from 'vue-material-design-icons/SortAscending.vue'
-import ShareVariantIcon from 'vue-material-design-icons/ShareVariant.vue'
-import TagIcon from 'vue-material-design-icons/Tag.vue'
+import { NcButton, NcSelect, NcActions, NcActionButton, NcActionInput, NcActionRouter, NcTextField } from '@nextcloud/vue'
+import { InformationVariantIcon, DeleteForeverIcon, TrashbinIcon, MagnifyIcon, EarthIcon, ViewGridIcon, ViewListIcon, PlusIcon, FolderIcon, ArrowLeftIcon, RssIcon, SortAlphabeticalAscendingIcon, SortBoolAscendingIcon, SortClockAscendingOutlineIcon, SortCalendarAscendingIcon, SortNumericAscendingIcon, SortAscendingIcon, ShareVariantIcon, TagIcon } from './Icons.js'
 import { actions, mutations } from '../store/index.js'
 import { generateUrl } from '@nextcloud/router'
 import BulkEditing from './BulkEditing.vue'
-import copy from 'copy-text-to-clipboard'
 
 export default {
 	name: 'Controls',
 	components: {
+		NcButton,
 		BulkEditing,
-		NcMultiselect,
+		DeleteForeverIcon,
+		TrashbinIcon,
+		NcSelect,
 		NcActions,
 		NcActionButton,
 		NcActionInput,
@@ -160,10 +169,12 @@ export default {
 		TagIcon,
 		NcTextField,
 		MagnifyIcon,
+		InformationVariantIcon,
 	},
 	props: {},
 	data() {
 		return {
+			searchTimeout: null,
 			url: '',
 			search: this.$route.params.search || '',
 			sortingOptions: {
@@ -177,9 +188,19 @@ export default {
 		}
 	},
 	computed: {
+		isTrashbin() {
+			return this.$route.name === this.routes.TRASHBIN || (this.$route.name === this.routes.FOLDER && this.folder && this.folder.softDeleted)
+		},
+		isTrashbinRoot() {
+			return this.$route.name === this.routes.TRASHBIN
+		},
 		backLink() {
 			if (this.folder && this.folderPath.length > 1) {
 				return { name: this.routes.FOLDER, params: { folder: this.folder.parent_folder } }
+			}
+
+			if (this.isTrashbin) {
+				return { name: this.routes.TRASHBIN }
 			}
 
 			return { name: this.routes.HOME }
@@ -235,7 +256,7 @@ export default {
 				window.location.origin
 					+ generateUrl(
 						'/apps/bookmarks/public/rest/v2/bookmark?'
-							+ params.toString()
+							+ params.toString(),
 					)
 			)
 		},
@@ -265,16 +286,20 @@ export default {
 			this.$store.dispatch(actions.OPEN_FOLDER_SHARING, this.folder.id)
 		},
 
+		onOpenFolderDetails() {
+			this.$store.dispatch(actions.OPEN_FOLDER_DETAILS, this.folder.id)
+		},
+
 		onAddFolder() {
 			this.$store.commit(
 				mutations.DISPLAY_NEW_FOLDER,
-				!this.$store.state.displayNewFolder
+				!this.$store.state.displayNewFolder,
 			)
 		},
 		onAddBookmark() {
 			this.$store.commit(
 				mutations.DISPLAY_NEW_BOOKMARK,
-				!this.$store.state.displayNewBookmark
+				!this.$store.state.displayNewBookmark,
 			)
 		},
 
@@ -286,11 +311,25 @@ export default {
 		},
 
 		onSearch(query) {
-			this.$router.push({ name: this.routes.SEARCH, params: { search: query } })
+			if (this.searchTimeout) clearTimeout(this.searchTimeout)
+			this.searchTimeout = setTimeout(() => {
+				if (query.trim().length < 3) {
+					return
+				}
+				if (query.trim()) {
+					this.$router.push({ name: this.routes.SEARCH, params: { search: query, folder: this.folder?.id || -1 } })
+				} else if (this.$route.name === this.routes.SEARCH) {
+					if (this.folder) {
+						this.$router.push({ name: this.routes.FOLDER, params: { folder: this.folder.id } })
+					} else {
+						this.$router.push({ name: this.routes.HOME })
+					}
+				}
+			}, 350)
 		},
 
 		copyRssUrl() {
-			copy(this.rssURL)
+			navigator.clipboard.writeText(this.rssURL)
 			this.$store.commit(mutations.SET_NOTIFICATION, t('bookmarks', 'RSS feed copied'))
 		},
 
@@ -301,12 +340,16 @@ export default {
 			})
 			await this.$store.dispatch(actions.FETCH_PAGE)
 		},
+
+		async onEmptyTrashbin() {
+			await this.$store.dispatch(actions.EMPTY_TRASHBIN)
+		},
 	},
 }
 </script>
 <style>
 .controls {
-	padding: 4px 8px 0 44px;
+	padding: 5px 8px 0 50px;
 	display: flex;
 	position: absolute;
 	z-index: 100;
@@ -315,6 +358,7 @@ export default {
 	right: 0;
 	top: 0;
 	border-bottom: var(--color-border) 1px solid;
+	height: 46px;
 }
 
 .controls h2 {
@@ -323,23 +367,19 @@ export default {
 	margin-right: 10px;
 	display: flex;
 	flex-shrink: 0;
+	font-size: 1.1rem;
 }
 
 .controls h2 :nth-child(2) {
 	margin-left: 5px;
 }
 
-.controls .action-item {
-	height: 45px;
+.controls .strikethrough {
+	text-decoration: line-through;
 }
 
 .controls.wide {
 	padding: 0 8px;
-}
-
-.controls .custom-button:hover,
-.controls .custom-button:active {
-	background-color: var(--color-background-hover);
 }
 
 .controls + * {
@@ -369,8 +409,8 @@ export default {
 }
 
 .controls__right .inline-search {
-	max-width: 150px !important;
+	max-width: 300px !important;
 	position: relative;
-	top: 4px;
+	top: -4px;
 }
 </style>

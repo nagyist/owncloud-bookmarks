@@ -1,4 +1,5 @@
 <?php
+
 /*
  * Copyright (c) 2021. The Nextcloud Bookmarks contributors.
  *
@@ -14,13 +15,14 @@ use OCA\Bookmarks\Controller\InternalFoldersController;
 use OCA\Bookmarks\Exception\UnauthenticatedError;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\DataResponse;
-use \OCP\AppFramework\Middleware;
+use OCP\AppFramework\Middleware;
 
 class ExceptionMiddleware extends Middleware {
 	public function afterException($controller, $methodName, \Exception $exception): DataResponse {
 		if ($controller instanceof BookmarkController || $controller instanceof InternalBookmarkController || $controller instanceof FoldersController || $controller instanceof InternalFoldersController) {
 			if ($exception instanceof UnauthenticatedError) {
-				$res = new DataResponse(['status' => 'error', 'data' => 'Please authenticate first'], Http::STATUS_UNAUTHORIZED);
+				$res = new DataResponse(['status' => 'error', 'data' => ['Please authenticate first']], Http::STATUS_UNAUTHORIZED);
+				$res->throttle();
 				$res->addHeader('WWW-Authenticate', 'Basic realm="Nextcloud Bookmarks", charset="UTF-8"');
 				return $res;
 			}

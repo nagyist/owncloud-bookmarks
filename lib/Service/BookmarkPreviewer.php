@@ -1,6 +1,7 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -71,12 +72,16 @@ class BookmarkPreviewer implements IBookmarkPreviewer {
 	 * @param Bookmark $bookmark
 	 * @return IImage
 	 */
-	public function getImage($bookmark): ?IImage {
+	public function getImage($bookmark, $cacheOnly = false): ?IImage {
 		if ($this->enabled === 'false') {
 			return null;
 		}
 
 		if (!isset($bookmark)) {
+			return null;
+		}
+
+		if (!$bookmark->isWebLink()) {
 			return null;
 		}
 
@@ -94,7 +99,7 @@ class BookmarkPreviewer implements IBookmarkPreviewer {
 			} catch (NotFoundException $e) {
 			} catch (NotPermittedException $e) {
 			}
-			$image = $previewer->getImage($bookmark);
+			$image = $previewer->getImage($bookmark, $cacheOnly);
 			if (isset($image)) {
 				$this->cache->set($key, $image->serialize(), self::CACHE_TTL);
 				return $image;

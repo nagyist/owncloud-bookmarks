@@ -1,11 +1,11 @@
 <!--
-  - Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+  - Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
   -
   - This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
   -->
 
 <template>
-	<NcModal v-if="showNcModal" :title="title" @close="onClose">
+	<NcModal v-if="showNcModal" :name="title" @close="onClose">
 		<div class="move-dialog">
 			<FolderPicker :title="title" :filter="filterFolders" @submit="onSubmit" />
 		</div>
@@ -35,20 +35,20 @@ export default {
 					return n('bookmarks',
 						'Moving %n folder and some bookmarks',
 						'Moving %n folders and some bookmarks',
-						this.selection.folders.length
+						this.selection.folders.length,
 					)
 				} else {
 					return n('bookmarks',
 						'Moving %n folder',
 						'Moving %n folders',
-						this.selection.folders.length
+						this.selection.folders.length,
 					)
 				}
 			} else {
 				return n('bookmarks',
 					'Moving %n bookmark',
 					'Moving %n bookmarks',
-					this.selection.bookmarks.length
+					this.selection.bookmarks.length,
 				)
 			}
 		},
@@ -56,8 +56,11 @@ export default {
 	methods: {
 		async onSubmit(folderId) {
 			this.$store.commit(mutations.DISPLAY_MOVE_DIALOG, false)
-			await this.$store.dispatch(actions.MOVE_SELECTION, folderId)
-			this.$store.commit(mutations.RESET_SELECTION)
+			try {
+				await this.$store.dispatch(actions.MOVE_SELECTION, folderId)
+			} finally {
+				this.$store.commit(mutations.RESET_SELECTION)
+			}
 		},
 		onClose() {
 			this.$store.commit(mutations.DISPLAY_MOVE_DIALOG, false)

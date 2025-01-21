@@ -262,6 +262,7 @@ class BookmarkControllerTest extends TestCase {
 		$this->treeMapper->move(TreeMapper::TYPE_FOLDER, $this->folder2->getId(), $this->folder1->getId());
 
 		$this->publicFolder = new PublicFolder();
+		$this->publicFolder->setDescription('');
 		$this->publicFolder->setFolderId($this->folder1->getId());
 		$this->publicFolderMapper->insert($this->publicFolder);
 
@@ -300,7 +301,7 @@ class BookmarkControllerTest extends TestCase {
 		$output = $this->controller->getSingleBookmark($this->bookmark2Id);
 		$data = $output->getData();
 		$this->assertEquals('success', $data['status'], var_export($data, true));
-		$this->assertEquals("https://9gag.com/", $data['item']['url']);
+		$this->assertEquals('https://9gag.com/', $data['item']['url']);
 	}
 
 	/**
@@ -523,7 +524,7 @@ class BookmarkControllerTest extends TestCase {
 		$output = $this->publicController->getSingleBookmark(987);
 		$data = $output->getData();
 		$this->assertSame('error', $data['status'], var_export($data, true));
-		$this->assertSame(403, $output->getStatus());
+		$this->assertSame(404, $output->getStatus());
 	}
 
 	/**
@@ -541,7 +542,7 @@ class BookmarkControllerTest extends TestCase {
 		$output = $this->publicController->getBookmarks(-1, null, 'or', '', [], 10, false, $this->folder2->getId());
 		$data = $output->getData();
 		$this->assertEquals('success', $data['status'], var_export($data, true));
-		$this->assertCount(1, $data['data']); // TODO: 1-level search Limit!
+		$this->assertCount(1, $data['data']);
 	}
 
 	/**
@@ -591,7 +592,8 @@ class BookmarkControllerTest extends TestCase {
 		$this->authorizer->setUserId(null);
 
 		$res = $this->publicController->deleteBookmark($this->bookmark1Id);
-		$this->assertEquals('error', $res->getData()['status'], var_export($res->getData(), true));
+		$this->assertEquals('success', $res->getData()['status'], var_export($res->getData(), true));
+		$this->bookmarkMapper->find($this->bookmark1Id);
 	}
 
 	/**
@@ -684,7 +686,7 @@ class BookmarkControllerTest extends TestCase {
 
 		$bookmark = $this->bookmarkMapper->find($id);
 		$this->assertEquals('https://www.heise.de/', $bookmark->getUrl()); // normalized URL
-		$this->assertEquals("", $bookmark->getTitle());
+		$this->assertEquals('', $bookmark->getTitle());
 	}
 
 	/**

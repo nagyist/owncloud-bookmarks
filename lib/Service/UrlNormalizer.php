@@ -1,6 +1,7 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -12,7 +13,7 @@ use Rowbot\URL\Exception\TypeError;
 use Rowbot\URL\URL;
 
 class UrlNormalizer {
-	/** @var array<string, string>  */
+	/** @var array<string, string> */
 	private $cache = [];
 
 	public function __construct() {

@@ -1,6 +1,7 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -29,6 +30,9 @@ use OCP\AppFramework\Db\MultipleObjectsReturnedException;
  * @package OCA\Bookmarks\Service
  */
 class HtmlImporter {
+	// Taken from https://stackoverflow.com/questions/33126595/what-is-the-actual-range-of-a-mysql-int-column-in-this-situation
+	public const DB_MAX_INT = 2147483647;
+
 	/**
 	 * @var BookmarkMapper
 	 */
@@ -77,7 +81,7 @@ class HtmlImporter {
 	/**
 	 * @brief Import Bookmarks from html formatted file
 	 *
-	 * @param int $userId
+	 * @param string $userId
 	 * @param string $file
 	 * @param int|null $rootFolder
 	 *
@@ -90,7 +94,7 @@ class HtmlImporter {
 	 * @throws UserLimitExceededError
 	 * @throws HtmlParseError
 	 */
-	public function importFile($userId, string $file, int $rootFolder = null): array {
+	public function importFile(string $userId, string $file, ?int $rootFolder = null): array {
 		$content = file_get_contents($file);
 		return $this->import($userId, $content, $rootFolder);
 	}
@@ -98,7 +102,7 @@ class HtmlImporter {
 	/**
 	 * @brief Import Bookmarks from html
 	 *
-	 * @param int $userId
+	 * @param string $userId
 	 * @param string $content
 	 * @param int|null $rootFolderId
 	 *
@@ -109,11 +113,11 @@ class HtmlImporter {
 	 * @throws HtmlParseError
 	 * @throws MultipleObjectsReturnedException
 	 * @throws UnauthorizedAccessError
-	 * @throws UserLimitExceededError
+	 * @throws UserLimitExceededError|UnsupportedOperation
 	 *
 	 * @psalm-return array{imported: list<array>, errors: array<array-key, mixed|string>}
 	 */
-	public function import($userId, string $content, int $rootFolderId = null): array {
+	public function import(string $userId, string $content, ?int $rootFolderId = null): array {
 		$imported = [];
 		$errors = [];
 
@@ -172,7 +176,6 @@ class HtmlImporter {
 		$folder = new Folder();
 		$folder->setUserId($userId);
 		$folder->setTitle($folderParams['title']);
-		/** @var Folder $folder */
 		$folder = $this->folderMapper->insert($folder);
 		$this->treeMapper->move(TreeMapper::TYPE_FOLDER, $folder->getId(), $parentId, $index);
 		$newFolder = ['type' => 'folder', 'id' => $folder->getId(), 'title' => $folderParams['title'], 'children' => []];
@@ -207,11 +210,14 @@ class HtmlImporter {
 		$bm->setTitle($bookmark['title']);
 		$bm->setDescription($bookmark['description']);
 		if (isset($bookmark['add_date'])) {
-			$bm->setAdded($bookmark['add_date']->getTimestamp());
+			if ($bookmark['add_date']->getTimestamp() < self::DB_MAX_INT && $bookmark['add_date']->getTimestamp() > -self::DB_MAX_INT) {
+				$bm->setAdded($bookmark['add_date']->getTimestamp());
+			} else {
+				$bm->setAdded(time());
+			}
 		}
 
 		// insert bookmark
-		/** @var Bookmark $bm */
 		$bm = $this->bookmarkMapper->insertOrUpdate($bm);
 		// add to folder
 		$this->treeMapper->addToFolders(TreeMapper::TYPE_BOOKMARK, $bm->getId(), [$folderId], $index);

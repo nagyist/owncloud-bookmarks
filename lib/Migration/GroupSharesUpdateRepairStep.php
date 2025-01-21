@@ -1,6 +1,7 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -114,7 +115,7 @@ class GroupSharesUpdateRepairStep implements IRepairStep {
 			$notInGroupUsers = array_diff($usersInShare, $usersInGroup);
 
 			foreach ($notInGroupUsers as $userId) {
-				$this->folders->deleteSharedFolderOrFolder($userId, $groupShare['folder_id']);
+				$this->folders->deleteSharedFolderOrFolder($userId, $groupShare['folder_id'], true);
 				$sharedFolder = $this->sharedFolderMapper->findByFolderAndUser($groupShare['folder_id'], $userId);
 				$this->sharedFolderMapper->delete($sharedFolder);
 				$deleted++;

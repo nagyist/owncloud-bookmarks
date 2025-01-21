@@ -1,6 +1,7 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -65,12 +66,23 @@ class InternalFoldersController extends ApiController {
 
 	/**
 	 * @param int $folderId
+	 * @param bool $hardDelete
 	 * @return JSONResponse
 	 *
 	 * @NoAdminRequired
 	 */
-	public function deleteFolder($folderId): JSONResponse {
-		return $this->controller->deleteFolder($folderId);
+	public function deleteFolder(int $folderId, bool $hardDelete = false): JSONResponse {
+		return $this->controller->deleteFolder($folderId, $hardDelete);
+	}
+
+	/**
+	 * @param int $folderId
+	 * @return JSONResponse
+	 *
+	 * @NoAdminRequired
+	 */
+	public function undeleteFolder(int $folderId): JSONResponse {
+		return $this->controller->undeleteFolder($folderId);
 	}
 
 	/**
@@ -87,12 +99,24 @@ class InternalFoldersController extends ApiController {
 	/**
 	 * @param int $folderId
 	 * @param int $bookmarkId
+	 * @param $hardDelete
 	 * @return JSONResponse
 	 *
 	 * @NoAdminRequired
 	 */
-	public function removeFromFolder($folderId, $bookmarkId): JSONResponse {
-		return $this->controller->removeFromFolder($folderId, $bookmarkId);
+	public function removeFromFolder($folderId, $bookmarkId, bool $hardDelete = false): JSONResponse {
+		return $this->controller->removeFromFolder($folderId, $bookmarkId, $hardDelete);
+	}
+
+	/**
+	 * @param int $folderId
+	 * @param int $bookmarkId
+	 * @return JSONResponse
+	 *
+	 * @NoAdminRequired
+	 */
+	public function undeleteFromFolder(int $folderId, int $bookmarkId): JSONResponse {
+		return $this->controller->undeleteFromFolder($folderId, $bookmarkId);
 	}
 
 	/**
@@ -169,7 +193,7 @@ class InternalFoldersController extends ApiController {
 	 * @return DataResponse
 	 * @NoAdminRequired
 	 * @NoCSRFRequired
-	 * @CORS
+	 *
 	 * @PublicPage
 	 * @throws UnauthenticatedError
 	 */
@@ -181,7 +205,7 @@ class InternalFoldersController extends ApiController {
 	 * @return DataResponse
 	 * @NoAdminRequired
 	 * @NoCSRFRequired
-	 * @CORS
+	 *
 	 * @PublicPage
 	 * @throws UnauthenticatedError
 	 */
@@ -220,5 +244,14 @@ class InternalFoldersController extends ApiController {
 	 */
 	public function deleteShare($shareId): DataResponse {
 		return $this->controller->deleteShare($shareId);
+	}
+
+	/**
+	 * @return DataResponse
+	 * @NoAdminRequired
+	 * @NoCSRFRequired
+	 */
+	public function getDeletedFolders(): DataResponse {
+		return $this->controller->getDeletedFolders();
 	}
 }

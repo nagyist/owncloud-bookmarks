@@ -13,7 +13,7 @@ jobs:
 
     strategy:
       matrix:
-        php-versions: ['7.4', '8.0', '8.1', '8.2']
+        php-versions: ['8.0', '8.1', '8.2']
 
     name: php${{ matrix.php-versions }}
     steps:
@@ -33,7 +33,7 @@ jobs:
 
     strategy:
       matrix:
-        php-versions: ['7.4']
+        php-versions: ['8.3']
 
     name: cs php${{ matrix.php-versions }}
     steps:
@@ -57,14 +57,14 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [12.x]
+        node-version: [16.x]
 
     name: eslint node${{ matrix.node-version }}
     steps:
       - uses: actions/checkout@v2
 
       - name: Read package.json node and npm engines version
-        uses: skjnldsv/read-package-engines-version-actions@v1.2
+        uses: skjnldsv/read-package-engines-version-actions@v2.0
         id: versions
         with:
           fallbackNode: '^12'
@@ -90,14 +90,14 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [12.x]
+        node-version: [16.x]
 
     name: stylelint node${{ matrix.node-version }}
     steps:
       - uses: actions/checkout@v2
 
       - name: Read package.json node and npm engines version
-        uses: skjnldsv/read-package-engines-version-actions@v1.2
+        uses: skjnldsv/read-package-engines-version-actions@v2.0
         id: versions
         with:
           fallbackNode: '^12'

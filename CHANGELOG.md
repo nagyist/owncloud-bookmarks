@@ -4,6 +4,280 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [15.0.5] - 2025-01-18
+
+### Fixed
+
+* fix(FileCacheGCJob): Turn error into a warning and make it clearer what's needed to fix it
+* fix(archival): Properly interpret setting value
+* fix(IMPORT_BOOKMARKS): Properly reload folders after import
+* fix(TreeMapper#findChildren): Don't mix up type of children vs type of folder
+* fix: Make export work in non-root pages
+* Build(deps): Bump sanitize-html from 2.13.1 to 2.14.0
+* Build(deps): Bump @nextcloud/vue from 8.21.0 to 8.22.0
+* fix(FoldersController): Refactor addToFolder
+* Fix(l10n): Update translations from Transifex
+
+## [15.0.4] - 2024-12-12
+
+### Fixed
+
+* fix(BookmarkMapper): Be compatible with mysql ANSI_QUOTES option
+* Fix(l10n): Update translations from Transifex
+* fix(Bookmarkmapper): Don't count soft deleted bookmarks
+* chore: update deps
+
+## [15.0.3] - 2024-11-30
+
+### Fixed
+* fix(BookmarkService): Prevent creation of duplicate bookmarks
+* fix(softUndeleteEntry): Only reset index of bookmarks if it is indeed soft-deleted
+* Fix(l10n): Update translations from Transifex
+
+## [15.0.2] - 2024-09-22
+
+### Fix
+
+* fix(TreeMapper#isFolderSharedWithUser): Check full depth
+* fix(TreeMapper): Fix treatment of soft-deleted bookmarks
+
+## [15.0.1] - 2024-09-12
+
+### Fix
+
+* Don't use existing user when header is set
+
+## [15.0.0] - 2024-09-07
+
+### Breaking changes
+
+- Dropped support for Nextcloud < 30
+
+### New
+
+* New Nextcloud 30 UI Design
+* feat(Settings): Link to app store
+* feat(ux): Sync folder sidebar with opening folders
+
+### Fixed
+
+* fix(Db\Bookmark): Fix UTF-8 encoding of user-facing content
+* fix(HtmlImport): Don't fail if add_date int is too large
+* fix: Shared with you view was broken
+* fix(TreeMapper#getSoftDeletedRootItems): Avoid O(n^2) algorithm
+* fix(LoadingModal): Show spinner while emptying trashbin
+* fix(BookmarkController#import): Give more meanigful error message when upload failed
+* fix(WebviewController): Fix Copypasta
+* fix(BookmarkController#countBookmarks): Fix root folder count
+* fix(Navigation): Don't display Files menu entry if feature is not enabled
+* fix(Search): Only search after >2 characters have been entered
+
+## [14.2.3] - 2024-08-04
+
+### Fixed
+
+* fix(TreeMapper#deleteOldTrashbinItems)
+* feat(Trash bin): Add "empty trash bin" button
+* fix(Bookmark): Use strlen instead of mb_strlen to count bytes in string
+* fix(CrawlService): Increase timeout
+* fix(BackupJob): use array_merge instead of +
+* fix: php 8.0 support
+* fix: refactor API endpoints
+* Fix(l10n): Update translations from Transifex
+* Fix php 8.0 support
+* fix(Settings): Archiving and Backup options were not working
+* fix(previews): use secure version of screeenly (Thanks to Stefan Zweifel)
+
+## [14.2.2] - 2024-06-17
+
+### Fixed
+
+* fix settings controller
+
+## [14.2.1] - 2024-06-15
+
+### Fixed
+
+* perf: Use distributed cache instead of local
+* fix: Folder search in root folder was broken
+* fix(Navigation): limit meter was broken
+* fix: Improve UX of admin settings
+
+## [14.2.0] - 2024-06-08
+
+### New
+
+* feat: Visualize click count
+
+### Fixed
+
+* fix: Soft-deleting multiple folders breaks interface
+* fix(Settings): Add icons for need-help and support-project sections
+* fix(PageresBookmarkPreviewer)
+* fix(FaviconPreviewer): Correctly use inferred favicon from scraper
+* fix: Improve virtual scroll
+* fix: Fix hard deletion of folders
+* fix: Fix hard deletion of bookmarks
+* fix: Small visual fixes 
+* fix: Display URL if title is empty
+
+## [14.1.2] - 2024-06-01
+
+### Fixed
+
+* Fix UI glitch of bookmarks spilling over to trashbin and shared folders sometimes
+
+## [14.1.1] - 2024-06-01
+
+### Fixed
+
+* Fix circle usage in code to avoid dependency hell
+
+## [14.1.0] - 2024-06-01
+
+### New
+
+- Allow sharing with Circles
+- Add trash bin to restore deleted items (Removes trash bin items after two months)
+- Add help and project support sections to settings
+
+### Fixed
+
+* fix(BookmarkMapper#_filterFolder): Include current folder in search Marcel Klehr 2 minutes ago
+* perf(TreeCacheManager): Increase cache lifetime to improve sync performance
+* perf: speed up getSubFolders for deleted folders
+* perf: speed up initial page load
+* Fix(Bookmark): Display URL if title is empty
+* fix(Authorizer): Don't throw HTTP 500 on malformed credentials
+* fix(l10n): word typo
+* fix: Fix backups
+
+## [14.0.2] - 2024-04-29
+
+### New
+
+* Add support for Nextcloud 29
+
+
+## [14.0.0] - 2024-04-28
+
+### Breaking changes
+* Drop support for Nextclod < 28
+
+### New
+* enh(search): Always search in current folder + Allow searching globally with one click
+* enh(BookmarksList): Allow searching for folders
+* enh(TreeFolder): Show bookmarks count in Folders overview
+* enh(BookmarksList): Wrap bookmarkslist__description in NcNoteCard
+
+### Changes
+* overhaul settings: Use settings modal
+* migrate(nc-vue): Upgrade to v8.x
+* feat(disable archive): Allow disabling archive functionality
+
+### Fixed
+* fix(IBookmarkPreviewer): No more on-demand loading
+* fix(VirtualScroll): Try to make it smoother
+* fix(Controls): Don't show folder when searching in root
+* fix(ItemSkeleton): Make it more beautiful
+* fix(Controls): Correct title of rss feed button
+* fix(Search): Increase width of search field
+* fix(SharedFolderIcon)
+* fix(WebViewController): Fix public link
+* fix(CustomPickerElement): Remove heading
+* fix(TreeFolder): Don't set childrenShown if there's no child folders
+* fix(Bookmark): Fix fallback icon
+* fix(Navigation): Always show counters even if 0
+* fix(ui): Scale down icons to 20px
+* fix(SettingsController): NoAdminRequired
+* refactor(settings): Create a UserSettingsService and load all settings via initial state
+* fix(Controls): Debounce new search bar
+* fix(BookmarkMapper#_selectTags): Always return a string for tags column
+* fix(TreeMapper#getChildren): Add more aggressive per-layer caching
+* fix(BookmarkWithTagsAndParent): Avoid requerying tags if a bookmark has no tags
+* fix(Authorizer): Don't run login again if there is already a session based on basic auth
+* Fix(l10n): Update translations from Transifex
+
+## [13.1.3] - 2023-12-18
+
+### Fixes
+
+* fix(Authorizer)
+
+## [13.1.2] - 2023-12-14
+
+### Fixed
+
+* fix(Controls): Always show search bar
+* fix(SearchProvider): Handle url being null
+* fix(remove cors annotation) Fix user getting logged out on public links
+* fix(WhatsnewModal check) Only show for major or minor version bumps
+* fix(service worker)
+* fix: drop collaboration resources integration to be compatible with nc 28
+* Fix(l10n): Update translations from Transifex
+
+## [13.1.1] - 2023-08-20
+
+### Fixed
+
+- Fix children endpoint
+
+## [13.1.0] - 2023-08-17
+
+### New
+ - Add a changelog-style whatsnew modal
+ - Allow specifying default folder in bookmarklet URL
+ - Allow creating javascript and file links
+ - Create WRITE permission to signify the permission to edit children
+ - Folder.vue: Allow editing (direct) share roots even if they're from a non-writable share
+
+### Fixed
+ - UI: Streamline initial load
+ - Fix Bookmarklet UI
+ - Fix UI glitch in bookmark-content Marcel Klehr Yesterday 16:52
+ - Update @nextcloud/vue
+ - Fix flow.js script name
+ - UI: Always align shared icon with folder icon
+ - Backend: Avoid Share loops
+ - UI: Rollback moving folders after failure
+ - propagate permissions across multi-share boundaries 
+ - fix(TreeMapper#getParentOf): Select correct type
+ - Check for empty arrays before accessing them
+ - BookmarksParser: Distinguish between dates in ms and s
+ - fix(CrawlService): Catch whatever Readability might throw at us
+ - fix(composer): Don't use "classmap-authoritative"
+ - Use the color-primary-element* variables
+ - Fix(l10n): 🔠 Update translations from Transifex
+
+## [13.0.1] - 2023-03-21
+
+### Fixed
+ - fix(CustomPickerElement): Autofocus
+ - fix(ReferenceProvider): Fix usage of preg_match :see_no_evil:
+
+## [13.0.0] - 2023-03-12
+
+### Changed
+- Drop support for nc 25
+
+### New
+- Implement a reference provider and a front-end widget for bookmarks
+
+## [12.1.0] - 2023-03-12
+
+### New
+- TreeFolder: Add more indentation layers
+- UX: Display loading skeletons only after 350ms
+
+### Fixed
+- chore(deps): Update dependencies
+- fix(ui): Use display names instead of ids
+- fix(CrawlService): Correct MAX_BODY_LENGTH from 90KB to 90 MB
+- fix(backups): refactor
+- fix(LinkExplorer): Replace phpUri with Rowbot\URL
+- Use built-in browser clipboard API
+- Fix(l10n): 🔠 Update translations from Transifex
+
 ## [12.0.0] - 2022-12-13
 ### Breaking changes
  - Drop support for nc < v25

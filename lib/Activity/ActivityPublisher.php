@@ -1,6 +1,7 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -14,7 +15,7 @@ use OCA\Bookmarks\Db\FolderMapper;
 use OCA\Bookmarks\Db\SharedFolder;
 use OCA\Bookmarks\Db\SharedFolderMapper;
 use OCA\Bookmarks\Db\TreeMapper;
-use OCA\Bookmarks\Events\BeforeDeleteEvent;
+use OCA\Bookmarks\Events\BeforeSoftDeleteEvent;
 use OCA\Bookmarks\Events\ChangeEvent;
 use OCA\Bookmarks\Events\CreateEvent;
 use OCA\Bookmarks\Events\MoveEvent;
@@ -26,6 +27,9 @@ use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use OCP\IL10N;
 
+/**
+ * @psalm-implements IEventListener<ChangeEvent>
+ */
 class ActivityPublisher implements IEventListener {
 	/**
 	 * @var IManager
@@ -103,7 +107,7 @@ class ActivityPublisher implements IEventListener {
 		$activity->setTimestamp(time());
 
 		/**
-		 * @var $sharedFolder SharedFolder
+		 * @var SharedFolder $sharedFolder
 		 */
 		try {
 			$sharedFolder = $this->sharedFolderMapper->find($event->getId());
@@ -117,7 +121,7 @@ class ActivityPublisher implements IEventListener {
 
 		if ($event instanceof CreateEvent) {
 			$activity->setSubject('share_created', ['folder' => $sharedFolder->getTitle(), 'sharee' => $sharedFolder->getUserId()]);
-		} elseif ($event instanceof BeforeDeleteEvent) {
+		} elseif ($event instanceof BeforeSoftDeleteEvent) {
 			$activity->setSubject('share_deleted', ['folder' => $sharedFolder->getTitle(), 'sharee' => $sharedFolder->getUserId()]);
 		} else {
 			return;
@@ -138,7 +142,7 @@ class ActivityPublisher implements IEventListener {
 		$activity->setTimestamp(time());
 
 		/**
-		 * @var $folder Folder
+		 * @var Folder $folder
 		 */
 		try {
 			$folder = $this->folderMapper->find($event->getId());
@@ -151,7 +155,7 @@ class ActivityPublisher implements IEventListener {
 		$activity->setObject(TreeMapper::TYPE_FOLDER, $folder->getId());
 		if ($event instanceof CreateEvent) {
 			$activity->setSubject('folder_created', ['folder' => $folder->getTitle()]);
-		} elseif ($event instanceof BeforeDeleteEvent) {
+		} elseif ($event instanceof BeforeSoftDeleteEvent) {
 			$activity->setSubject('folder_deleted', ['folder' => $folder->getTitle()]);
 		} elseif ($event instanceof MoveEvent) {
 			$activity->setSubject('folder_moved', ['folder' => $folder->getTitle()]);
@@ -160,7 +164,7 @@ class ActivityPublisher implements IEventListener {
 		}
 
 		/**
-		 * @var $shares SharedFolder[]
+		 * @var SharedFolder[] $shares
 		 */
 		$shares = $this->sharedFolderMapper->findByOwner($this->authorizer->getUserId());
 		$shares = array_merge($shares, $this->sharedFolderMapper->findByUser($this->authorizer->getUserId()));
@@ -190,7 +194,7 @@ class ActivityPublisher implements IEventListener {
 		$activity->setTimestamp(time());
 
 		/**
-		 * @var $bookmark Bookmark
+		 * @var Bookmark $bookmark
 		 */
 		try {
 			$bookmark = $this->bookmarkMapper->find($event->getId());
@@ -203,14 +207,14 @@ class ActivityPublisher implements IEventListener {
 
 		if ($event instanceof CreateEvent) {
 			$activity->setSubject('bookmark_created', ['bookmark' => $bookmark->getTitle()]);
-		} elseif ($event instanceof BeforeDeleteEvent) {
+		} elseif ($event instanceof BeforeSoftDeleteEvent) {
 			$activity->setSubject('bookmark_deleted', ['bookmark' => $bookmark->getTitle()]);
 		} else {
 			return;
 		}
 
 		/**
-		 * @var $shares SharedFolder[]
+		 * @var SharedFolder[] $shares
 		 */
 		$shares = $this->sharedFolderMapper->findByOwner($this->authorizer->getUserId());
 		$shares = array_merge($shares, $this->sharedFolderMapper->findByUser($this->authorizer->getUserId()));

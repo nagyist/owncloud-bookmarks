@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -21,7 +21,7 @@ self.addEventListener('install', (evt) => {
 	evt.waitUntil(
 		caches.open(STATIC_CACHE).then((cache) => {
 			return cache.addAll(FILES_TO_CACHE)
-		})
+		}),
 	)
 	self.skipWaiting()
 })
@@ -35,7 +35,7 @@ self.addEventListener('activate', (evt) => {
 				}
 				return Promise.resolve()
 			}))
-		})
+		}),
 	)
 	self.clients.claim()
 })
@@ -57,6 +57,6 @@ self.addEventListener('fetch', (event) => {
 			console.debug(e)
 			console.debug('Hitting cache', { request: event.request })
 			return caches.match(event.request)
-		})
+		}),
 	)
 })

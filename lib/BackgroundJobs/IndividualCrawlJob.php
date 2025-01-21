@@ -1,20 +1,21 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
 
 namespace OCA\Bookmarks\BackgroundJobs;
 
+use OCA\Bookmarks\Db\Bookmark;
+use OCA\Bookmarks\Db\BookmarkMapper;
+use OCA\Bookmarks\Service\CrawlService;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\IJobList;
 use OCP\BackgroundJob\Job;
-use OCA\Bookmarks\Db\Bookmark;
-use OCA\Bookmarks\Db\BookmarkMapper;
-use OCA\Bookmarks\Service\CrawlService;
 use OCP\IConfig;
 
 class IndividualCrawlJob extends Job {
@@ -36,7 +37,7 @@ class IndividualCrawlJob extends Job {
 	private $jobList;
 
 	public function __construct(
-		IConfig $settings, BookmarkMapper $bookmarkMapper, CrawlService $crawler, ITimeFactory $timeFactory, IJobList $jobList
+		IConfig $settings, BookmarkMapper $bookmarkMapper, CrawlService $crawler, ITimeFactory $timeFactory, IJobList $jobList,
 	) {
 		parent::__construct($timeFactory);
 		$this->settings = $settings;

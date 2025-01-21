@@ -1,6 +1,7 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -22,16 +23,18 @@ use OCP\Files\IRootFolder;
 use OCP\Files\Node;
 use OCP\Files\NotPermittedException;
 use OCP\IL10N;
-use OCP\Lock\LockedException;
-use Psr\Log\LoggerInterface;
 use OCP\IURLGenerator;
 use OCP\IUser;
 use OCP\IUserSession;
+use OCP\Lock\LockedException;
 use OCP\Util;
 use OCP\WorkflowEngine\EntityContext\IUrl;
+use OCP\WorkflowEngine\Events\RegisterEntitiesEvent;
+use OCP\WorkflowEngine\Events\RegisterOperationsEvent;
 use OCP\WorkflowEngine\IManager;
 use OCP\WorkflowEngine\IOperation;
 use OCP\WorkflowEngine\IRuleMatcher;
+use Psr\Log\LoggerInterface;
 
 class CreateBookmark implements IOperation {
 	private const REGEX_URL = "%(https?|ftp)://(\S+(:\S*)?@|\d{1,3}(\.\d{1,3}){3}|(([a-z\d\x{00a1}-\x{ffff}]+-?)*[a-z\d\x{00a1}-\x{ffff}]+)(\.([a-z\d\x{00a1}-\x{ffff}]+-?)*[a-z\d\x{00a1}-\x{ffff}]+)*(\.[a-z\x{00a1}-\x{ffff}]{2,6}))(:\d+)?([^\s]*)?%ium";
@@ -69,15 +72,15 @@ class CreateBookmark implements IOperation {
 
 	public static function register(IEventDispatcher $dispatcher): void {
 		if (interface_exists(IManager::class)) {
-			$dispatcher->addListener(IManager::EVENT_NAME_REG_OPERATION, static function ($event) {
+			$dispatcher->addListener(RegisterOperationsEvent::class, static function (RegisterOperationsEvent $event) {
 				$operation = OC::$server->query(CreateBookmark::class);
-				$event->getSubject()->registerOperation($operation);
-				Util::addScript('bookmarks', 'flow');
+				$event->registerOperation($operation);
+				Util::addScript('bookmarks', 'bookmarks-flow');
 			});
-			$dispatcher->addListener(IManager::EVENT_NAME_REG_ENTITY, static function ($event) {
+			$dispatcher->addListener(RegisterEntitiesEvent::class, static function (RegisterEntitiesEvent $event) {
 				$entity = OC::$server->query(Bookmark::class);
-				$event->getSubject()->registerEntity($entity);
-				Util::addScript('bookmarks', 'flow');
+				$event->registerEntity($entity);
+				Util::addScript('bookmarks', 'bookmarks-flow');
 			});
 		}
 	}

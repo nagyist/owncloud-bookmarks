@@ -1,6 +1,7 @@
 <?php
+
 /*
- * Copyright (c) 2020. The Nextcloud Bookmarks contributors.
+ * Copyright (c) 2020-2024. The Nextcloud Bookmarks contributors.
  *
  * This file is licensed under the Affero General Public License version 3 or later. See the COPYING file.
  */
@@ -143,7 +144,7 @@ class OrphanedTreeItemsRepairStep implements IRepairStep {
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('b.id', 'b.user_id')
 			->from('bookmarks', 'b')
-			->leftJoin('b', 'bookmarks_tree', 't', 'b.id = t.id AND t.type = '.$qb->createPositionalParameter('bookmark'))
+			->leftJoin('b', 'bookmarks_tree', 't', 'b.id = t.id AND t.type = ' . $qb->createPositionalParameter('bookmark'))
 			->where($qb->expr()->isNull('t.id'));
 		$orphanedBookmarks = $qb->execute();
 		$i = 0;
