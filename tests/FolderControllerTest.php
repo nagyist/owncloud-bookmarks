@@ -489,7 +489,7 @@ class FolderControllerTest extends TestCase {
 		$data = $output->getData();
 		$this->assertEquals('success', $data['status'], var_export($data, true));
 		$this->assertEquals('foo', $data['item']['title']); // title unchanged
-		$this->assertEquals($this->folderMapper->findRootFolder($this->userId)->getId(), $data['item']['parent_folder']);
+		$this->assertEquals(-1, $data['item']['parent_folder']);
 
 		$output = $this->controller->getFolders();
 		$topLevelFolders = array_map(fn ($item) => $item['id'], $output->getData()['data']);
